@@ -72,12 +72,12 @@
 *
 ***/
 
-#include "fpsgame.h"
-#include <my_global.h>
+//#include "fpsgame.h"
+//#include <my_global.h>
 #include <mysql.h>
 
 #include "db.h"
-#include "remod.h"
+//#include "remod.h"
 
 #define inrange(n, _max) (n>=0 && n<_max)
 
@@ -185,7 +185,7 @@ namespace db
 			loopi(sqlite3_data_count(stmt))
 			{
 				if(buf.length()) buf.add(' ');
-				defformatstring(colname)("%s", sqlite3_column_name(stmt, i));
+				defformatstring(colname, "%s", sqlite3_column_name(stmt, i));
 				buf.put(colname, strlen(colname));
 			}
 			buf.add('\0');
@@ -218,7 +218,7 @@ namespace db
 			if (row) {
 				int num_fields = mysql_num_fields(stmt);
 				for (int i = 0; i < num_fields; i++) {
-					defformatstring(field)("%s", row[i]);
+					defformatstring(field, "%s", row[i]);
 					const char *stripped_field = stripslashes(&field[0]);
 					const char *escaped_field = escapestring(stripped_field);
 					DELETEA(stripped_field);
@@ -295,6 +295,21 @@ namespace db
 		mysql_dbs.remove(*dbuid);
 	}
 
+	// return last inserted id
+	void cs_mysql_last_insert_id(int *dbuid)
+	{
+	    // check if db uid in range
+		if (!mysql_dbs.exists(*dbuid)) {
+			intret(-1); return;
+		}
+
+		// select DB from list
+		MYSQL *db = mysql_dbs[*dbuid];
+
+        // get latest inserted id
+		intret(mysql_insert_id(db));
+	}
+
 
 /**
  * Open Mysql database connection
@@ -362,6 +377,13 @@ COMMANDN(mysql_error,     cs_mysql_error,   "i");
  * @arg1 db uid
  */
 COMMANDN(mysql_close,     cs_mysql_close,   "i");
+
+/**
+ * Close connection to MySQL database
+ * @group db
+ * @arg1 db uid
+ */
+COMMANDN(mysql_last_insert_id,     cs_mysql_last_insert_id,   "i");
 
 }
 }

@@ -4,6 +4,7 @@
 #include "engine.h"
 #include "rconmod.h"
 #include "remod.h"
+#include "commandev.h"
 
 #ifdef IRC
 #include "irc.h"
@@ -51,18 +52,18 @@ void logoutf(const char *fmt, ...)
     va_end(args);
 }
 
+
 static void writelog(FILE *file, const char *buf)
 {
     static uchar ubuf[512];
-    int len = strlen(buf), carry = 0;
+    size_t len = strlen(buf), carry = 0;
     while(carry < len)
     {
-        int numu = encodeutf8(ubuf, sizeof(ubuf)-1, &((const uchar *)buf)[carry], len - carry, &carry);
+        size_t numu = encodeutf8(ubuf, sizeof(ubuf)-1, &((const uchar *)buf)[carry], len - carry, &carry);
         if(carry >= len) ubuf[numu++] = '\n';
         fwrite(ubuf, 1, numu, file);
     }
 }
-
 
 static void writelogv(FILE *file, const char *fmt, va_list args)
 {
@@ -89,12 +90,15 @@ void fatal(const char *fmt, ...)
 
 void conoutfv(int type, const char *fmt, va_list args)
 {
-    string sf, sp;
-    vformatstring(sf, fmt, args);
-    filtertext(sp, sf);
-    logoutf("%s", sp);
+    //remod
+    //logoutfv(fmt, args);
+
     // remod
-    remod::rcon::sendmsg(sp);
+    static char buf[LOGSTRLEN];
+    vformatstring(buf, fmt, args, sizeof(buf));
+    logoutf("%s", buf);
+    filtertext(buf, buf);
+    remod::rcon::sendmsg(buf);
 }
 
 void conoutf(const char *fmt, ...)
@@ -113,6 +117,8 @@ void conoutf(int type, const char *fmt, ...)
     va_end(args);
 }
 #endif
+
+#define DEFAULTCLIENTS 8
 
 enum { ST_EMPTY, ST_LOCAL, ST_TCPIP };
 
@@ -187,6 +193,9 @@ void cleanupserver()
     if(lansock != ENET_SOCKET_NULL) enet_socket_destroy(lansock);
     pongsock = lansock = ENET_SOCKET_NULL;
 }
+
+VARF(maxclients, 0, DEFAULTCLIENTS, MAXCLIENTS, { if(!maxclients) maxclients = DEFAULTCLIENTS; });
+VARF(maxdupclients, 0, 0, MAXCLIENTS, { if(serverhost) serverhost->duplicatePeers = maxdupclients ? maxdupclients : MAXCLIENTS; });
 
 void process(ENetPacket *packet, int sender, int chan);
 //void disconnect_client(int n, int reason);
@@ -327,18 +336,24 @@ const char *disconnectreason(int reason)
     }
 }
 
+// remod
+VAR(ipbanmsg, 0, 1, 1);
+
 void disconnect_client(int n, int reason)
 {
     if(!clients.inrange(n) || clients[n]->type!=ST_TCPIP) return;
     enet_peer_disconnect(clients[n]->peer, reason);
     server::clientdisconnect(n);
-    delclient(clients[n]);
     const char *msg = disconnectreason(reason);
     string s;
-    if(msg) formatstring(s)("client (%s) disconnected because: %s", clients[n]->hostname, msg);
-    else formatstring(s)("client (%s) disconnected", clients[n]->hostname);
+    if(msg) formatstring(s, "client (%s) disconnected because: %s", ((server::clientinfo *)(clients[n]->info))->name, msg);
+    else formatstring(s, "client (%s) disconnected", ((server::clientinfo *)(clients[n]->info))->name);
     logoutf("%s", s);
-    server::sendservmsg(s);
+
+    delclient(clients[n]);
+
+    // remod
+    if(!(!ipbanmsg && reason == DISC_IPBAN)) server::sendservmsg(s);
 }
 
 void kicknonlocalclients(int reason)
@@ -435,6 +450,7 @@ bool requestmaster(const char *req)
     if(mastersock == ENET_SOCKET_NULL)
     {
         mastersock = connectmaster(false);
+        if(mastersock == ENET_SOCKET_NULL) return false;
         lastconnectmaster = masterconnecting = totalmillis ? totalmillis : 1;
     }
 
@@ -464,9 +480,9 @@ void processmasterinput()
         int cmdlen = args - input;
         while(args < end && iscubespace(*args)) args++;
 
-        if(!strncmp(input, "failreg", cmdlen))
+        if(matchstring(input, cmdlen, "failreg"))
             conoutf(CON_ERROR, "master server registration failed: %s", args);
-        else if(!strncmp(input, "succreg", cmdlen))
+        else if(matchstring(input, cmdlen, "succreg"))
             conoutf("master server registration succeeded");
         else server::processmasterinput(input, cmdlen, args);
 
@@ -534,6 +550,8 @@ void sendserverinforeply(ucharbuf &p)
     enet_socket_send(pongsock, &pongaddr, &buf, 1);
 }
 
+#define MAXPINGDATA 32
+
 void checkserversockets()        // reply all server info requests
 {
     static ENetSocketSet readset, writeset;
@@ -564,7 +582,7 @@ void checkserversockets()        // reply all server info requests
         buf.data = pong;
         buf.dataLength = sizeof(pong);
         int len = enet_socket_receive(sock, &pongaddr, &buf, 1);
-        if(len < 0) return;
+        if(len < 0 || len > MAXPINGDATA) continue;
         ucharbuf req(pong, len), p(pong, sizeof(pong));
         p.len += len;
         server::serverinforeply(req, p);
@@ -594,16 +612,12 @@ void checkserversockets()        // reply all server info requests
     }
 }
 
-
-#define DEFAULTCLIENTS 8
-
-VARF(maxclients, 0, DEFAULTCLIENTS, MAXCLIENTS, { if(!maxclients) maxclients = DEFAULTCLIENTS; });
 VAR(serveruprate, 0, 0, INT_MAX);
 SVAR(serverip, "");
-VARF(serverport, 0, server::serverport(), 0xFFFF, { if(!serverport) serverport = server::serverport(); });
+VARF(serverport, 0, server::serverport(), 0xFFFF-1, { if(!serverport) serverport = server::serverport(); });
 
 #ifdef STANDALONE
-int curtime = 0, lastmillis = 0;
+int curtime = 0, lastmillis = 0, elapsedtime = 0;
 // remod
 _VAR(totalmillis, totalmillis, 0, 0, INT_MAX, IDF_READONLY);
 #endif
@@ -641,9 +655,10 @@ void serverslice(bool dedicated, uint timeout)   // main server update, called f
 
     if(dedicated)
     {
-        int millis = (int)enet_time_get(), elapsed = millis - totalmillis;
+        int millis = (int)enet_time_get();
+        elapsedtime = millis - totalmillis;
         static int timeerr = 0;
-        int scaledtime = server::scaletime(elapsed) + timeerr;
+        int scaledtime = server::scaletime(elapsedtime) + timeerr;
         curtime = scaledtime/100;
         timeerr = scaledtime%100;
         if(server::ispaused()) curtime = 0;
@@ -682,7 +697,7 @@ void serverslice(bool dedicated, uint timeout)   // main server update, called f
                 client &c = addclient(ST_TCPIP);
                 c.peer = event.peer;
                 c.peer->data = &c;
-                char hn[1024];
+                string hn;
                 copystring(c.hostname, (enet_address_get_host_ip(&c.peer->address, hn, sizeof(hn))==0) ? hn : "unknown");
                 logoutf("client connected (%s)", c.hostname);
                 int reason = server::clientconnect(c.num, c.peer->address.host);
@@ -829,10 +844,10 @@ static BOOL WINAPI consolehandler(DWORD dwCtrlType)
 static void writeline(logline &line)
 {
     static uchar ubuf[512];
-    int len = strlen(line.buf), carry = 0;
+    size_t len = strlen(line.buf), carry = 0;
     while(carry < len)
     {
-        int numu = encodeutf8(ubuf, sizeof(ubuf), &((uchar *)line.buf)[carry], len - carry, &carry);
+        size_t numu = encodeutf8(ubuf, sizeof(ubuf), &((uchar *)line.buf)[carry], len - carry, &carry);
         DWORD written = 0;
         WriteConsole(outhandle, ubuf, numu, &written, NULL);
     }
@@ -1034,20 +1049,27 @@ void rundedicatedserver()
 			DispatchMessage(&msg);
 		}
 		serverslice(true, 5);
+
+		//remod
 		remod::rcon::update();
-        #ifdef IRC
-        ircslice();
-        #endif
-        remod::eventsupdate();
+        	#ifdef IRC
+        	irc_checkserversockets();
+        	ircslice();
+        	#endif
+        	remod::checkresume();
+        	remod::eventsupdate();
 	}
 #else
+    // remod
     for(;;)
     {
         serverslice(true, 5);
         remod::rcon::update();
         #ifdef IRC
+        irc_checkserversockets();
         ircslice();
         #endif
+        remod::checkresume();
         remod::eventsupdate();
     }
 #endif
@@ -1078,7 +1100,7 @@ bool setuplistenserver(bool dedicated)
     }
     serverhost = enet_host_create(&address, min(maxclients + server::reserveclients(), MAXCLIENTS), server::numchannels(), 0, serveruprate);
     if(!serverhost) return servererror(dedicated, "could not create server host");
-    loopi(maxclients) serverhost->peers[i].data = NULL;
+    serverhost->duplicatePeers = maxdupclients ? maxdupclients : MAXCLIENTS;
     address.port = server::serverinfoport(serverport > 0 ? serverport : -1);
     pongsock = enet_socket_create(ENET_SOCKET_TYPE_DATAGRAM);
     if(pongsock != ENET_SOCKET_NULL && enet_socket_bind(pongsock, &address) < 0)
@@ -1115,9 +1137,19 @@ void initserver(bool listen, bool dedicated)
 
     // remod
     if(strcmp(initcfg, "") == 0)
-        execfile("server-init.cfg", false);
+    {
+        // if can't read default config
+        // show error message and stop server
+        if(!execfile("server-init.cfg", false))
+        {
+            fatal("%s", "Fatal error: could not read file \"server-init.cfg\". Rename \"server-init.cfg.default\" to \"server-init.cfg\", or specify the name of the config file by using the command line parameter ./remod -f<filename> (i.e. ./remod -fmyconfig.cfg)");
+            exit(1);
+        }
+    }
     else
+    {
         execfile(initcfg, true);
+    }
 
     // remod
     if(authfile)

@@ -3,8 +3,7 @@
 * date:     2007
 * author:   degrave
 *
-* remot control
-* remot control
+* remote control via netcat
 */
 
 #include <stdio.h>
@@ -57,7 +56,7 @@ bool rconserver_udp::addpeer(struct sockaddr_in addr)
             rconpeers[i].addr = addr;
             rconpeers[i].logined = true;
             ipstr = inet_ntoa(addr.sin_addr);
-            formatstring(msg)("Rcon: new peer [%s:%i]", ipstr, ntohs(addr.sin_port));
+            formatstring(msg, "Rcon: new peer [%s:%i]", ipstr, ntohs(addr.sin_port));
             conoutf(msg);
             return true;
         }
@@ -102,7 +101,7 @@ void rconserver_udp::logout(struct sockaddr_in addr)
             int addrlen = sizeof(addr);
             sendto(sock, msg, len, 0, (struct sockaddr *)&rconpeers[i].addr, addrlen);
             rconpeers[i].logined = false;
-            defformatstring(quit_msg)("Rcon: quit [%s:%i]", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
+            defformatstring(quit_msg, "Rcon: quit [%s:%i]", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
             conoutf(quit_msg);
             return;
         }
@@ -217,17 +216,20 @@ void rconserver_udp::sendmsg(const char *msg, int len)
         data = newstring(msg);
     }
 
+    char utfbuf[MAXBUF];
+    memset(utfbuf, 0, MAXBUF);
+    len = encodeutf8((uchar*)utfbuf, MAXBUF, (uchar*)data, len, 0);
+
     // send text to all peers
     for(int i=0; i<MAXRCONPEERS; i++)
     {
         if(rconpeers[i].logined)
         {
-            sendto(sock, data, len, 0, (struct sockaddr *)&rconpeers[i].addr, addrlen);
+            sendto(sock, utfbuf, len, 0, (struct sockaddr *)&rconpeers[i].addr, addrlen);
         }
     }
 
     DELETEA(data);
-
 }
 
 void rconserver_udp::sendmsg(const char *msg)
@@ -254,7 +256,13 @@ void rconserver_udp::update()
             {
                 logout(fromaddr);
             }
-            else execute(buf);
+            else
+            {
+                char cubebuf[MAXBUF];
+                memset(cubebuf, 0, MAXBUF);
+                decodeutf8((uchar*)cubebuf, MAXBUF, (uchar*)buf, recvlen, 0);
+                execute(cubebuf);
+            }
         }
     }
 }

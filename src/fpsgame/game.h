@@ -64,8 +64,8 @@ enum
 struct fpsentity : extentity
 {
     int triggerstate, lasttrigger;
-
-    fpsentity() : triggerstate(TRIGGER_RESET), lasttrigger(0) {}
+    
+    fpsentity() : triggerstate(TRIGGER_RESET), lasttrigger(0) {} 
 };
 
 enum { GUN_FIST = 0, GUN_SG, GUN_CG, GUN_RL, GUN_RIFLE, GUN_GL, GUN_PISTOL, GUN_FIREBALL, GUN_ICEBALL, GUN_SLIMEBALL, GUN_BITE, GUN_BARREL, NUMGUNS };
@@ -210,7 +210,7 @@ enum
     S_CHAINSAW_IDLE,
 
     S_HIT,
-
+    
     S_FLAGFAIL
 };
 
@@ -498,7 +498,7 @@ struct fpsstate
         }
         else if(m_sp)
         {
-            if(m_dmsp)
+            if(m_dmsp) 
             {
                 armourtype = A_BLUE;
                 armour = 25;
@@ -518,20 +518,32 @@ struct fpsstate
         // ammo
         loopi(NUMGUNS)
         {
-            if(remodex::getammo(i)>-1) ammo[i] = remodex::getammo(i);
+            if(remodex::getammo(i) > -1)
+            {
+                ammo[i] = remodex::getammo(i);
+            }
         }
         ammo[GUN_FIST] = 1;
         // armour
-        if(remodex::getarmourtype()>-1) armourtype = remodex::getarmourtype();
-        if(remodex::getarmour()>-1) armour = remodex::getarmour();
+        if(remodex::getarmourtype() > -1)
+        {
+            armourtype = remodex::getarmourtype();
+        }
+        if(remodex::getarmour() > -1)
+        {
+            armour = remodex::getarmour();
+        }
         // health
-        if(remodex::gethealth()>0)
+        if(remodex::gethealth() > 0)
         {
             maxhealth = remodex::gethealth();
             health = remodex::gethealth();
         }
         // gunselect
-        if(remodex::getgunselect()>-1) gunselect = remodex::getgunselect();
+        if(remodex::getgunselect() > -1)
+        {
+            gunselect = remodex::getgunselect();
+        }
     }
 
     // just subtract damage here, can set death, etc. later in code calling this
@@ -765,6 +777,7 @@ namespace game
     extern void sendmapinfo();
     extern void stopdemo();
     extern void changemap(const char *name, int mode);
+    extern void forceintermission();
     extern void c2sinfo(bool force = false);
     extern void sendposition(fpsent *d, bool reliable = false);
 
@@ -864,3 +877,4 @@ namespace server
 }
 
 #endif
+

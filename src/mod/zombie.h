@@ -1,5 +1,6 @@
 /*
-* remod:    remodex.cpp
+* remodex
+* remod:    zombie.cpp
 * date:     2011
 * author:   degrave
 *

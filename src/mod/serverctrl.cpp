@@ -101,7 +101,7 @@ void getflags(int *pcn)
 void version()
 {
     string txt;
-    formatstring(txt)("Remodex %s %s (build %s %s) %s/%s", REMOD_CODENAME, REMOD_VERSION, __DATE__, __TIME__, REMOD_SYSTEM, REMOD_ARCH);
+    formatstring(txt, "Remodex %s %s (build %s %s) %s/%s", REMOD_CODENAME, REMOD_VERSION, __DATE__, __TIME__, REMOD_SYSTEM, REMOD_ARCH);
     result(txt);
 }
 
@@ -265,21 +265,7 @@ void getonline(int *pcn)
 
 void _getteamscore(char *team)
 {
-    if(smode && smode->hidefrags())
-    {
-        intret(smode->getteamscore(team));
-    }
-    else
-    {
-        int teamfrags = 0;
-        loopv(clients) if(clients[i]->team[0])
-        {
-            clientinfo *ci = clients[i];
-            if(ci && (strcmp(team, ci->team) == 0)) teamfrags+=ci->state.frags;
-        }
-        intret(teamfrags);
-    }
-
+        intret(getteamscore(team));
 }
 
 void getrank(int *pcn)
@@ -311,7 +297,7 @@ void getrank(int *pcn)
     intret(-1);
 }
 
-void mute(int *pcn, int *val)
+void mute(int *pcn, int *val, const char *reason)
 {
     int cn = (int)*pcn;
     bool v = (bool)*val;
@@ -523,7 +509,7 @@ void loadmap(const char *name)
         int slen = strlen(buf);
         if(buf[slen] != '/' && buf[slen] != '\\' && slen+1 < (int)sizeof(buf)) { buf[slen] = '/'; buf[slen+1] = '\0'; }
     }
-    formatstring(fname)("%s%s.ogz", buf, name);
+    formatstring(fname, "%s%s.ogz", buf, name);
 
     if(server::mapdata) DELETEP(server::mapdata);
     server::mapdata = openfile(fname, "rb");
@@ -532,11 +518,11 @@ void loadmap(const char *name)
     string msg;
     if(!server::mapdata)
     {
-        formatstring(msg)("[failed to open %s, map do not exist on the server]", name);
+        formatstring(msg, "[failed to open %s, map do not exist on the server]", name);
     }
     else
     {
-        formatstring(msg)("[map %s was uploaded to server, \"/getmap\" to receive it]", name);
+        formatstring(msg, "[map %s was uploaded to server, \"/getmap\" to receive it]", name);
     }
     sendservmsg(msg);
 }
@@ -554,7 +540,7 @@ void savemap(const char *name)
         int slen = strlen(buf);
         if(buf[slen] != '/' && buf[slen] != '\\' && slen+1 < (int)sizeof(buf)) { buf[slen] = '/'; buf[slen+1] = '\0'; }
     }
-    formatstring(fname)("%s%s.ogz", buf, name);
+    formatstring(fname, "%s%s.ogz", buf, name);
 
     // status message
     string msg;
@@ -564,7 +550,7 @@ void savemap(const char *name)
         data = openfile(fname, "wb");
         if(!data)
         {
-            formatstring(msg)("[failed to open %s for writing]", fname);
+            formatstring(msg, "[failed to open %s for writing]", fname);
         }
         else
         {
@@ -580,12 +566,12 @@ void savemap(const char *name)
             // close file
             data->close();
             DELETEP(data);
-            formatstring(msg)("[map %s was saved]", name);
+            formatstring(msg, "[map %s was saved]", name);
         }
     }
     else
     {
-        formatstring(msg)("[no map to save]");
+        formatstring(msg, "[no map to save]");
     }
     sendservmsg(msg);
 }
@@ -598,7 +584,7 @@ void listclients()
     int numclients = 0;
     loopv(clients) if(clients[i])
     {
-        formatstring(cn)("%d", clients[i]->clientnum);
+        formatstring(cn, "%d", clients[i]->clientnum);
         if(numclients++) buf.add(' ');
         buf.put(cn, strlen(cn));
     }
@@ -609,28 +595,6 @@ void listclients()
 void getvalue(const char* ident, const char* def) {
 	const char *alias = getalias(ident);
 	result(alias && strcmp("", alias) ? alias : def);
-}
-
-void editmute(int *pcn, int *val)
-{
-    int cn = (int)*pcn;
-    bool v = (bool)*val;
-
-    clientinfo *ci = (clientinfo *)getinfo(cn);
-    if(ci)
-    {
-        if(ci->state.ext.editmuted != v)
-        {
-            ci->state.ext.editmuted = v;
-            remod::onevent(ONEDITMUTE, "ii", v ? 1 : 0, cn);
-        }
-    }
-}
-
-void iseditmuted(int *cn)
-{
-    clientinfo *ci = (clientinfo *)getinfo(*cn);
-    intret(ci && ci->state.ext.editmuted);
 }
 
 void uptimef(const char *fmt)
@@ -846,7 +810,7 @@ void getextensions()
     int numext = 0;
     for(int i = 0; i<extensions->length(); i++) if(extensions->getbuf()[i]) // :`( - ugly
     {
-        formatstring(ext)("%s", extensions->getbuf()[i]);
+        formatstring(ext, "%s", extensions->getbuf()[i]);
         if(numext++) buf.add(' ');
         buf.put(ext, strlen(ext));
     }
@@ -1062,10 +1026,144 @@ void setpriv(int *cn, char *s)
 
 void getpos(int *cn)
 {
-    clientinfo *ci = (clientinfo *)getclientinfo(*cn);
+    clientinfo *ci = (clientinfo *)getinfo(*cn);
     if(!ci || ci->state.state == CS_SPECTATOR) return;
-    defformatstring(pos)("%s %s %s", floatstr(ci->state.o.x), floatstr(ci->state.o.y), floatstr(ci->state.o.z));
+    defformatstring(pos, "%s %s %s", floatstr(ci->state.o.x), floatstr(ci->state.o.y), floatstr(ci->state.o.z + 14.0f)); // 14.0f camera height
     result(pos);
+}
+
+void getdamage(int *cn)
+{
+    clientinfo *ci = (clientinfo *)getinfo(*cn);
+    if(!ci)
+    {
+        intret(0);
+    }
+    else
+    {
+        intret(ci->state.damage);
+    }
+}
+
+void getshotdamage(int *cn)
+{
+    clientinfo *ci = (clientinfo *)getinfo(*cn);
+    if(!ci)
+    {
+        intret(0);
+    }
+    else
+    {
+        intret(ci->state.shotdamage);
+    }
+}
+
+void getwepdamage(int *cn, int *wep)
+{
+    clientinfo *ci = (clientinfo *)getinfo(*cn);
+    if(!ci || *wep < 0 || *wep > GUN_PISTOL)
+    {
+        intret(0);
+    }
+    else
+    {
+        intret(ci->state.ext.guninfo[*wep].damage);
+    }
+}
+
+void getwepshotdamage(int *cn, int *wep)
+{
+    clientinfo *ci = (clientinfo *)getinfo(*cn);
+    if(!ci || !wep || *wep < 0 || *wep > GUN_PISTOL)
+    {
+        intret(0);
+    }
+    else
+    {
+        intret(ci->state.ext.guninfo[*wep].shotdamage);
+    }
+}
+
+void loopteams(ident *id, uint *body)
+{
+    if(id->type!=ID_ALIAS || !m_teammode) return;
+
+    vector<char*> teams;
+    if(m_ctf || m_collect)
+    {
+        teams.add("good");
+        teams.add("evil");
+    }
+    else
+    {
+        bool addteam;
+        loopv(clients)
+        {
+            clientinfo* c = clients[i];
+            if(c->state.state != CS_SPECTATOR)
+            {
+                if(teams.length())
+                {
+                    addteam = true;
+                    loopv(teams)
+                    {
+                        char *team = teams[i];
+                        if(strcmp(team, c->team) == 0)
+                        {
+                            addteam = false;
+                            break;
+                        }
+                    }
+                    if(addteam) teams.add(newstring(c->team));
+                }
+                else
+                {
+                    teams.add(newstring(c->team));
+                }
+            }
+        }
+    }
+
+    identstack stack;
+    loopv(teams)
+    {
+        char *teamstr = newstring(teams[i]);
+        if(i)
+        {
+            if(id->valtype == VAL_STR) delete[] id->val.s;
+            else id->valtype = VAL_STR;
+            id->val.s = teamstr;
+        }
+        else
+        {
+            tagval t;
+            t.setstr(teamstr);
+            pusharg(*id, t, stack);
+            id->flags &= ~IDF_UNKNOWN;
+        }
+        execute(body);
+    }
+    if(scores.length()) poparg(*id);
+    loopv(teams)
+    {
+        DELETEA(teams[i]);
+    }
+}
+
+void reqauth(int *cn, char *desc)
+{
+    clientinfo *ci = (clientinfo *)getinfo(*cn);
+    if(ci) {
+        const char *domain = desc;
+
+        // ugly code to acess authserv var
+        if(!desc || !desc[0])
+        {
+            ident *id = getident("serverauth");
+            domain = *id->storage.s;
+        }
+        sendf(*cn, 1, "ris", N_REQAUTH, domain);
+    }
 }
 
 /**
@@ -1251,7 +1349,7 @@ COMMAND(spectator, "ii");
  * @group server
  * @arg1 map name
  */
-ICOMMAND(map, "s", (char *name), sendf(-1, 1, "risii", N_MAPCHANGE, name, gamemode, 1); server::changemap(name, gamemode));
+ICOMMAND(map, "s", (char *name), server::changemap(name, gamemode));
 
 /**
  * Change map and mode
@@ -1259,7 +1357,7 @@ ICOMMAND(map, "s", (char *name), sendf(-1, 1, "risii", N_MAPCHANGE, name, gamemo
  * @arg1 map name
  * @arg2 mode number (see: getmode and $MODENAMES)
  */
-ICOMMAND(mapmode, "si", (char *name, int *mode), sendf(-1, 1, "risii", N_MAPCHANGE, name, *mode, 1); server::changemap(name, *mode));
+ICOMMAND(mapmode, "si", (char *name, int *mode), server::changemap(name, *mode));
 
 /**
  * Force player to hate himself and to want to die
@@ -1386,6 +1484,12 @@ COMMAND(cleargbans, "");
  * @group player
  */
 ICOMMAND(numclients, "", (), intret(numclients(-1, false, true, false)));
+
+/**
+ * Get count of connected players except spectators and bots
+ * @group player
+ */
+ICOMMAND(numactiveclients, "", (), intret(numclients(-1, true, true, false)));
 
 /**
  * Check if player with specified cn exists
@@ -1554,22 +1658,6 @@ COMMAND(getvalue, "ss");
 ICOMMAND(eval, "C", (char *s), executeret(s));
 
 /**
- * Ignore specified client changes in coop edit mode
- * @group player
- * @arg1 client number
- * @arg2 1 or 0
- */
-COMMAND(editmute, "ii");
-
-/**
- * Check if player is editmuted
- * @group player
- * @arg1 client number
- * @return 1 if editmuted, 0 if not
- */
-COMMAND(iseditmuted, "i");
-
-/**
  * Formats server's uptime
  * @group server
  * @arg1 format string
@@ -1720,6 +1808,111 @@ COMMAND(getpos, "i");
  * @group player
  * @arg1 client number
  * @arg2 gun ("FI" = 0, "SG", "CG", "RL", "RI", "GL", "PI" = 6)
+ * @return specified weapon accuracy
  */
 ICOMMAND(getwepaccuracy, "ii", (int *cn, int *gun), intret(getwepaccuracy(*cn, *gun)));
+
+/**
+ * Get dealt damage
+ * @group player
+ * @arg1 cn
+ * @return dealt damage
+ */
+COMMAND(getdamage, "i");
+
+/**
+ * Get wasted damage
+ * @group player
+ * @arg1 cn
+ * @return wasted damage
+ */
+COMMAND(getshotdamage, "i");
+
+/**
+ * Get weapon dealt damage
+ * @group player
+ * @arg1 cn
+ * @arg2 gun
+ * @return weapon dealt damage
+ */
+COMMAND(getwepdamage, "ii");
+
+/**
+ * Get weapon wasted damage
+ * @group player
+ * @arg1 cn
+ * @arg2 gun
+ * @return weapon wasted damage
+ */
+COMMAND(getwepshotdamage, "ii");
+
+/**
+ * Loop through team names
+ * @group server
+ * @arg1 team
+ * @arg2 body of function to loop
+ * @example  loopteams team [ echo $team ]
+ */
+COMMAND(loopteams, "re");
+
+/**
+ * Rename player
+ * @group player
+ * @arg1 client number
+ * @arg2 name
+ */
+ICOMMAND(rename, "is", (int *cn, const char *name), rename(*cn, name));
+
+/**
+ * Force send map to client
+ * @group server
+ * @arg1 client number
+ */
+ICOMMAND(sendmap, "i", (int *cn), sendmapto(*cn));
+
+/**
+ * Make player ghost
+ * @group player
+ * @arg1 1 to make ghost, 0 to unghost
+ * @arg2 client number
+ */
+ICOMMAND(ghost, "ii", (int *val, int*cn), ghost(*cn, (bool)*val));
+
+/**
+ * Check if specified player is ghost
+ * @group player
+ * @arg1 client number
+ * @return 0 or 1
+ */
+ICOMMAND(isghost, "i", (int *cn), {
+            clientinfo *ci = getinfo(*cn);
+            intret(ci ? (ci->state.ext.ghost ? 1 : 0) : 0);
+         });
+/**
+ * Force start intermission
+ * @group server
+ */
+ICOMMAND(forceintermission, "", (), server::startintermission());
+
+/**
+ * Request claim auth from client
+ * @group server
+ * @arg1 cn
+ * @arg2 domain (default serverauth)
+ */
+COMMAND(reqauth, "is");
+
+// debug flood bug
+COMMANDN(debugflood, debugFlood, "");
+
+/**
+ * Get number of suicides
+ * @group player
+ * @arg1 client number
+ * @return number of suicides
+ */
+ICOMMAND(getsuicides, "i", (int *cn), {
+            clientinfo *ci = getinfo(*cn);
+            intret(ci ? ci->state.ext.suicides : 0);
+         });
 }

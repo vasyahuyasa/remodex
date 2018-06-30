@@ -14,11 +14,11 @@ When player do teamkill
 
 @event onfrag 
 @arg1 cn
-When player do frag (d@event on't count teamkills)
+When player do frag (don't count teamkills)
 
 @event ondeath 
 @arg1 cn
-When player die (d@event on't count suicides)
+When player die (don't count suicides)
 
 @event onsuicide 
 @arg1 cn
@@ -229,3 +229,40 @@ When ircpublic message
 @arg1 name
 @arg2 text
 When irc private message to bot
+
+@event onmutemodetrigger
+@arg1 cn
+When editmute variable don't allow the player speak
+
+@event onresumegame
+@arg1 cn
+When client request unpause game
+
+@event onovertime
+When time's up and teams are tied
+
+@event onspawn
+@arg1 cn
+When player spawn
+
+@event onghost
+@arg1 cn
+@arg2 1|0
+When player in ghost mode
+
+@event onmutetrigger
+@arg1 cn
+Call when player write with mute flag
+
+@event onghosttrigger
+@arg1 cn
+When player edit in ghost mode
+
+@event onreceivemap
+@arg1 cn
+When map uploaded to server by client
+
+@event onflood
+@arg1 cn
+@arg2 flood type
+When client reach flood limit ignore that type events for some time (flood type: 0 - unknown, 1 - chat, 2 - rename, 3 - switchmodel, 4 - team, 5 - editvar)

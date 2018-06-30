@@ -253,12 +253,29 @@ namespace remod
 
 void extstate::reset()
 {
+    // don't reset vars on map change
+    /*
     muted = false;
-    editmuted  = false;
+    ghost = false;
+
+    lastmutetrigger= 0;
+    lastghosttrigger = 0;
+    */
+
+    suicides = 0;
+
     loopi(NUMGUNS)
     {
         guninfo[i].damage = 0;
         guninfo[i].shotdamage = 0;
+    }
+
+    loopi(NUMFLOOD)
+    {
+        flood[i].floodlimit = 0;
+        flood[i].lastevent = 0;
+        flood[i].lastwarning = 0;
+        flood[i].strikes = 0;
     }
 }
 
@@ -420,7 +437,7 @@ void writebans()
                 tmsk <<= 1;
                 cidrmsk++;
             }
-            formatstring(maskedip)("%i.%i.%i.%i/%i", ip.b[0], ip.b[1], ip.b[2], ip.b[3], cidrmsk);
+            formatstring(maskedip, "%i.%i.%i.%i/%i", ip.b[0], ip.b[1], ip.b[2], ip.b[3], cidrmsk);
 
             f->printf("permban %s \"%s\"\n", maskedip, b.reason);
         }
@@ -438,7 +455,7 @@ void writebans()
                 tmsk <<= 1;
                 cidrmsk++;
             }
-            formatstring(maskedip)("%i.%i.%i.%i/%i", b->ipoctet[0], b->ipoctet[1], b->ipoctet[2], b->ipoctet[3], cidrmsk);
+            formatstring(maskedip, "%i.%i.%i.%i/%i", b->ipoctet[0], b->ipoctet[1], b->ipoctet[2], b->ipoctet[3], cidrmsk);
             f->printf("permban %s \"%s\"\n", maskedip, b->reason);
         }
 
@@ -463,8 +480,8 @@ bool loadents(const char *fname, vector<entity> &ents, uint *crc)
     string mapname, ogzname, entsname;
     copystring(mapname, fname, 100);
     cutogz(mapname);
-    formatstring(ogzname)("%s/%s.ogz", remod::mapdir, mapname);
-    formatstring(entsname)("%s/%s.ents", remod::mapdir, mapname);
+    formatstring(ogzname, "%s/%s.ogz", remod::mapdir, mapname);
+    formatstring(entsname, "%s/%s.ents", remod::mapdir, mapname);
     path(ogzname);
     path(entsname);
 
@@ -530,7 +547,7 @@ bool loadents(const char *fname, vector<entity> &ents, uint *crc)
 bool writeents(const char *mapname, vector<entity> &ents, uint mapcrc)
 {
     string file;
-    formatstring(file)("mapinfo/%s.ents", mapname);
+    formatstring(file, "mapinfo/%s.ents", mapname);
 
     stream *mapi = opengzfile(path(file), "w+b");
 
@@ -577,7 +594,7 @@ void setmaster(clientinfo *ci, int priv)
     if(ci->privilege != PRIV_NONE)
     {
         name = privname(ci->privilege);
-        formatstring(msg)("%s relinquished %s", colorname(ci), name);
+        formatstring(msg, "%s relinquished %s", colorname(ci), name);
         sendservmsg(msg);
         remod::onevent(ONSETMASTER, "iisss", ci->clientnum, 0, "", "", "");
     }
@@ -613,7 +630,7 @@ void setmaster(clientinfo *ci, int priv)
     if(ci->privilege != PRIV_NONE)
     {
         name = privname(ci->privilege);
-        formatstring(msg)("%s claimed %s", colorname(ci), name);
+        formatstring(msg, "%s claimed %s", colorname(ci), name);
         sendservmsg(msg);
         remod::onevent(ONSETMASTER, "iisss", ci->clientnum, ci->privilege, "", "", "");
     }
@@ -631,4 +648,375 @@ int getwepaccuracy(int cn, int gun)
     return(acc);
 }
 
+// current mutemode
+VAR(mutemode, 0, 0, NUMMUTEMODE-1);
+
+// return 1 if player can't talk, 0 if allowed
+bool checkmutemode(clientinfo *ci)
+{
+    bool muted = false;
+    switch(mutemode)
+    {
+    case MUTEMODE_SPECS:
+        {
+            if(ci->state.state == CS_SPECTATOR && !ci->privilege)
+            {
+                muted = true;
+            }
+            break;
+        }
+    case MUTEMODE_PLAYERS:
+        {
+            if(!ci->privilege)
+            {
+                muted = true;
+            }
+            break;
+        }
+    case MUTEMODE_MASTERS:
+        {
+            if(ci->privilege != PRIV_ADMIN)
+            {
+                muted = true;
+            }
+            break;
+        }
+
+    case MUTEMODE_NONE:
+    default:
+        break;
+    }
+    return muted;
+}
+
+// delay in seconds before unpause game
+VAR(resumedelay, 0, 0, 100);
+
+int resumetime;
+_VAR(resumetimer, resumetimer, 0, 0, 1, IDF_READONLY);
+void pausegame(bool val, clientinfo *ci)
+{
+    // pause game if val = 1
+    if(val)
+    {
+        resumetimer = 0;
+        server::pausegame(val, ci);
+    }
+    else
+    {
+        if(resumedelay == 0)
+        {
+            server::pausegame(val, ci);
+            return;
+        }
+
+        if(resumetimer || !server::gamepaused) return;
+
+        // start resume game counter
+        resumetime = totalmillis + resumedelay*1000;
+        resumetimer = 1;
+        onevent(ONRESUMEGAME, "i", ci ? ci->clientnum : -1);
+    }
+}
+
+void checkresume()
+{
+    if(!server::gamepaused || (resumetimer == 0)) return;
+
+    // unpause game
+    if(resumetime <= totalmillis)
+    {
+        resumetimer = 0;
+        server::pausegame(false);
+    }
+}
+
+int getteamscore(const char *team)
+{
+    int score = 0;
+    if(smode && smode->hidefrags())
+    {
+        score = smode->getteamscore(team);
+    }
+    else
+    {
+        loopv(clients)
+        if(clients[i]->state.state != CS_SPECTATOR && clients[i]->team[0])
+        {
+            clientinfo *ci = clients[i];
+            if(ci && (strcmp(team, ci->team) == 0))
+                score += ci->state.frags;
+        }
+    }
+    return score;
+}
+
+bool isteamsequalscore()
+{
+    int goodscore = getteamscore("good");
+    int evilscore = getteamscore("evil");
+    return (goodscore == evilscore);
+}
+
+void rename(int cn, const char* name)
+{
+    // don't rename bots
+    if(cn < 0 || cn >= 128) return;
+
+    clientinfo *ci = (clientinfo *)getinfo(cn);
+
+    // invalid cn or empty new name
+    if(!ci || name == NULL || name[0] == 0) return;
+
+    char newname[MAXNAMELEN + 1];
+    newname[MAXNAMELEN] = 0;
+    filtertext(newname, name, false, MAXNAMELEN);
+
+    putuint(ci->messages, N_SWITCHNAME);
+    sendstring(newname, ci->messages);
+
+    vector<uchar> buf;
+    putuint(buf, N_SWITCHNAME);
+    sendstring(newname, buf);
+
+    packetbuf p(MAXTRANS, ENET_PACKET_FLAG_RELIABLE);
+    putuint(p, N_CLIENT);
+    putint(p, ci->clientnum);
+    putint(p, buf.length());
+    p.put(buf.getbuf(), buf.length());
+    sendpacket(ci->clientnum, 1, p.finalize(), -1);
+
+    string oldname;
+    copystring(oldname, ci->name);
+    copystring(ci->name, newname);
+
+    remod::onevent(ONSWITCHNAME, "iss", ci->clientnum, ci->name, oldname);
+}
+
+static void freegetmap(ENetPacket *packet)
+{
+    loopv(clients)
+    {
+        clientinfo *ci = clients[i];
+        if(ci->getmap == packet) ci->getmap = NULL;
+    }
+}
+
+void sendmapto(int cn)
+{
+    clientinfo *ci = (clientinfo *)getinfo(cn);
+    if(!ci || !m_edit) return;
+
+    if(!mapdata) conoutf("no map to send to %s(%i)", ci->name, cn);
+    else if(ci->getmap) conoutf("already sending map to %s(%i)", ci->name, cn);
+    else
+    {
+        // remod
+        remod::onevent(ONGETMAP, "i", cn);
+
+        sendservmsgf("[%s is getting the map]", colorname(ci));
+        if((ci->getmap = sendfile(cn, 2, mapdata, "ri", N_SENDMAP)))
+            ci->getmap->freeCallback = freegetmap;
+        ci->needclipboard = totalmillis ? totalmillis : 1;
+    }
+}
+
+bool iseditcommand(int type)
+{
+    switch(type)
+    {
+        case N_EDITF:
+        case N_EDITT:
+        case N_EDITM:
+        case N_FLIP:
+        case N_COPY:
+        case N_PASTE:
+        case N_ROTATE:
+        case N_REPLACE:
+        case N_DELCUBE:
+        case N_REMIP:
+        case N_SENDMAP:
+            return true;
+
+        default:
+            return false;
+    }
+}
+
+void ghost(int cn, bool v)
+{
+    clientinfo *ci = getinfo(cn);
+    if(!ci) return;
+    ci->state.ext.ghost = v;
+    onevent(ONGHOST, "ii", cn, v ? 1 : 0);
+}
+
+// Red Eclipse (c)
+bool filterstring(char *dst, const char *src, bool newline, bool colour, bool whitespace, bool wsstrip, size_t len)
+{
+    bool filtered = false;
+    size_t n = 0;
+    for(int c = uchar(*src); c && n <= len; c = uchar(*++src))
+    {
+        if(newline && (c=='\n' || c=='\r')) c = ' ';
+        if(c=='\f')
+        {
+            if(!colour) dst[n++] = c;
+            else
+            {
+                filtered = true;
+                c = *++src;
+                if(!c) break;
+                else if(c=='z')
+                {
+                    c = *++src;
+                    if(c) c = *++src;
+                    if(!c) break;
+                }
+                else if(c == '[' || c == '(' || c == '{')
+                {
+                    const char *end = strchr(src, c == '[' ? ']' : (c == '(' ? ')' : '}'));
+                    src += end ? end-src : strlen(src);
+                }
+
+            }
+            continue;
+        }
+        if(iscubeprint(c) || (iscubespace(c) && whitespace && (!wsstrip || n)))
+            dst[n++] = c;
+        else filtered = true;
+    }
+    if(whitespace && wsstrip && n) while(iscubespace(dst[n-1])) dst[--n] = 0;
+    dst[n <= len ? n : len] = 0;
+    return filtered;
+}
+
+// to keep irc colors work
+size_t old_encodeutf8(uchar *dstbuf, size_t dstlen, const uchar *srcbuf, size_t srclen, size_t *carry)
+{
+    uchar *dst = dstbuf, *dstend = &dstbuf[dstlen];
+    const uchar *src = srcbuf, *srcend = &srcbuf[srclen];
+    if(src < srcend && dst < dstend) do
+    {
+        int uni = cube2uni(*src);
+        if(uni <= 0x7F)
+        {
+            if(dst >= dstend) goto done;
+            const uchar *end = min(srcend, &src[dstend-dst]);
+            do
+            {
+                *dst++ = uni;
+                if(++src >= end) goto done;
+                uni = cube2uni(*src);
+            }
+            while(uni <= 0x7F);
+        }
+        if(uni <= 0x7FF) { if(dst + 2 > dstend) goto done; *dst++ = 0xC0 | (uni>>6); goto uni2; }
+        else if(uni <= 0xFFFF) { if(dst + 3 > dstend) goto done; *dst++ = 0xE0 | (uni>>12); goto uni3; }
+        else if(uni <= 0x1FFFFF) { if(dst + 4 > dstend) goto done; *dst++ = 0xF0 | (uni>>18); goto uni4; }
+        else if(uni <= 0x3FFFFFF) { if(dst + 5 > dstend) goto done; *dst++ = 0xF8 | (uni>>24); goto uni5; }
+        else if(uni <= 0x7FFFFFFF) { if(dst + 6 > dstend) goto done; *dst++ = 0xFC | (uni>>30); goto uni6; }
+        else goto uni1;
+    uni6: *dst++ = 0x80 | ((uni>>24)&0x3F);
+    uni5: *dst++ = 0x80 | ((uni>>18)&0x3F);
+    uni4: *dst++ = 0x80 | ((uni>>12)&0x3F);
+    uni3: *dst++ = 0x80 | ((uni>>6)&0x3F);
+    uni2: *dst++ = 0x80 | (uni&0x3F);
+    uni1:;
+    }
+    while(++src < srcend);
+
+done:
+    if(carry) *carry += src - srcbuf;
+    return dst - dstbuf;
+}
+    // networkmessage to flood message type
+    inline size_t floodtype(int type)
+    {
+        size_t flood = FLOOD_OTHER;
+        switch(type)
+        {
+        case N_SAYTEAM:
+        case N_TEXT:
+            flood = FLOOD_TEXT;
+            break;
+
+        case N_SWITCHNAME:
+            flood = FLOOD_SWITCHNAME;
+            break;
+
+        case N_SWITCHTEAM:
+            flood = FLOOD_SWITCHTEAM;
+            break;
+
+        case N_EDITVAR:
+            flood = FLOOD_EDITVAR;
+            break;
+
+        default:
+            break;
+        }
+        return flood;
+    }
+
+    #define FLOODDELAY 500
+    #define STRIKELIMIT 5
+    #define FLOODMUTE 10000
+    #define FLOODTRIGGERTIME 10000
+    bool checkflood(clientinfo *ci, int type)
+    {
+        bool isflood = false;
+        size_t floodmsg = floodtype(type);
+        floodstate &fs = ci->state.ext.flood[floodmsg];
+
+        // if faster than limit
+        if((totalmillis - fs.lastevent) < FLOODDELAY) {
+            fs.strikes++;
+        }
+
+        // strike limit is reached, ignore next events
+        if(fs.strikes >= STRIKELIMIT)
+        {
+            fs.floodlimit = totalmillis + FLOODMUTE;
+            fs.strikes = 0;
+        }
+
+        // if client is flooder
+        if((totalmillis - fs.floodlimit) < 0)
+        {
+            isflood = true;
+            if((totalmillis - fs.lastwarning) > FLOODTRIGGERTIME) {
+                fs.lastwarning = totalmillis;
+                remod::onevent(ONFLOOD, "ii", ci->clientnum, floodmsg);
+            }
+        }
+        fs.lastevent = totalmillis;
+        return isflood;
+    }
+
+    void debugFlood()
+    {
+        loopvrev(clients)
+        {
+            clientinfo *ci = clients[i];
+            conoutf("Name: %s", ci->name);
+            conoutf("totalmillis: %d", totalmillis);
+            conoutf("STRIKELIMIT: %d", STRIKELIMIT);
+            loopi(NUMFLOOD)
+            {
+                floodstate &fs = ci->state.ext.flood[i];
+                conoutf("floodstate %d:", i);
+                conoutf("    int lastevent %d:", fs.lastevent);
+                conoutf("    size_t strikes %d:", fs.strikes);
+                conoutf("    int lastwarning %d:", fs.lastwarning);
+                conoutf("    int floodlimit %d:", fs.floodlimit);
+            }
+        }
+    }
+
+    void addSuicide(clientinfo *ci)
+    {
+        if(ci)
+            ci->state.ext.suicides++;
+    }
 }

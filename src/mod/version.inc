@@ -1,6 +1,6 @@
 // version, change on release
 #ifndef REMOD_VERSION
-#define REMOD_VERSION "SVN build $Rev: 368 $"
+#define REMOD_VERSION "v1.1.4"
 #endif
 
 // codename
@@ -34,3 +34,10 @@
     #define REMOD_ARCH "x??"
 #endif
 
+#ifndef REMOD_URL
+#define REMOD_URL "https://github.com/vasyahuyasa/remodex"
+#endif
+
+#ifndef MOD_NAME
+#define MOD_NAME "Remodex"
+#endif

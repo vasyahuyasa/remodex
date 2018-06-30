@@ -8,10 +8,14 @@ USE_IRCBOT=true
 
 #Sqlite3 support? true|false
 USE_SQLITE3=true
+SQLITE3_USE_SYSTEM_LIBS=false
 
 #Mysql support? true|false
 USE_MYSQL=true
+MYSQL_USE_SYSTEM_LIBS=false
 
+#Use ssytem enet libraryie
+ENET_USE_SYSTEM_LIBS=false
 ######################################
 
 ### Tools
@@ -49,29 +53,29 @@ ifneq (,$(findstring FreeBSD,$(PLATFORM)))
 SERVER_NAME=$(SERVER_PREFIX)_freebsd$(PLATFORM_SUFFIX)
 endif
 
-### Folders, libraries, includes
+### Directories, libraries, includes
 ifneq (,$(findstring MINGW,$(PLATFORM)))
 SERVER_INCLUDES+= -DSTANDALONE $(INCLUDES) -Iinclude
 SERVER_LIBS= -Llib -lzdll -lenet -lws2_32 -lwinmm -lstdc++
 else
 SERVER_INCLUDES+= -DSTANDALONE $(INCLUDES)
-SERVER_LIBS= -Lenet/.libs -L/usr/local/lib -lenet -lz -lstdc++
+SERVER_LIBS= -L/usr/local/lib -lenet -lz -lstdc++ -lm
 endif
 
 ifeq ($(PLATFORM),SunOS)
 SERVER_LIBS+= -lsocket -lnsl
 endif
 
-CXXFLAGS= -O2 -s -fomit-frame-pointer -Wall -fsigned-char -DSTANDALONE
-#override CXXFLAGS+= -g -DDEBUG # uncomment for debugging
+CXXFLAGS=-fomit-frame-pointer -Wall -fsigned-char -DSTANDALONE
 
-ifeq (,$(findstring -g,$(CXXFLAGS)))
-ifeq (,$(findstring -pg,$(CXXFLAGS)))
-  STRIP=strip
-endif
-endif
+INCLUDES= -Ishared -Iengine -Ifpsgame -Imod -Imod/hashlib2plus/src -Imod/cryptomod/polarssl/include
 
-INCLUDES= -Ishared -Iengine -Ifpsgame -Ienet/include -Imod -Imod/hashlib2plus/src -Imod/cryptomod/polarssl/include
+### Embended ENET
+ifeq ($(ENET_USE_SYSTEM_LIBS),true)
+else
+override INCLUDES += -Ienet/include
+override SERVER_LIBS += -Lenet/.libs
+endif
 
 SERVER_OBJS= \
 	shared/crypto-standalone.o \
@@ -85,17 +89,17 @@ SERVER_OBJS= \
 	mod/commandev-standalone.o \
 	mod/commandhandler-standalone.o \
 	mod/serverctrl-standalone.o \
+	mod/remod-standalone.o \
 	mod/rconmod-standalone.o \
 	mod/rconmod_tcp-standalone.o \
 	mod/rconmod_udp-standalone.o \
-	mod/remod-standalone.o \
 	mod/varbox-standalone.o \
 	mod/cryptomod-standalone.o \
 	mod/cryptomod/polarssl/library/md5-standalone.o \
 	mod/cryptomod/polarssl/library/sha1-standalone.o \
 	mod/cryptomod/polarssl/library/sha2-standalone.o \
 	mod/cryptomod/polarssl/library/sha4-standalone.o \
-        mod/banlist-standalone.o \
+      	mod/banlist-standalone.o \
 	mod/jsonbanlist-standalone.o \
 	mod/remodex-standalone.o \
 	mod/arena-standalone.o \
@@ -107,9 +111,13 @@ SERVER_OBJS= \
 
 #geoip
 ifeq ($(USE_GEOIP),true)
-override CXXFLAGS+= -DGEOIPDATADIR -DGEOIP
-override INCLUDES+= -Imod/libGeoIP
-override SERVER_OBJS+= mod/geoipmod-standalone.o mod/libGeoIP/GeoIP-standalone.o
+override CXXFLAGS+= -DGEOIP -DGEOIPDATADIR -DPACKAGE_VERSION=\"1.6.9\"
+override INCLUDES+= -Imod/libGeoIP/
+override SERVER_OBJS+= \
+        mod/geoipmod2-standalone.o \
+	mod/libGeoIP/GeoIP-standalone.o \
+	mod/libGeoIP/GeoIPCity-standalone.o \
+        mod/libGeoIP/GeoIP_deprecated-standalone.o
 endif
 #end of geoip
 
@@ -137,19 +145,33 @@ endif
 #sqlite3
 ifeq ($(USE_SQLITE3),true)
 override CXXFLAGS+= -DSQLITE3
+
+ifeq ($(SQLITE3_USE_SYSTEM_LIBS),true)
+override SERVER_LIBS+= -lsqlite3
+else
+override CXXFLAGS+= -DSQLITE_THREADSAFE=1
 override INCLUDES+= -Imod/sqlite3
 #linux-only libs
 ifeq ($(PLATFORM),Linux)
 override SERVER_LIBS+= -ldl -lpthread
 endif
-override SERVER_OBJS+= mod/sqlite3/sqlite3-standalone.o mod/sqlite3-standalone.o
+override SERVER_OBJS+= mod/sqlite3/sqlite3-standalone.o
 endif
+
+override SERVER_OBJS+= mod/sqlite3-standalone.o
+endif
+
 #end of sqlite3
 
 
 
 #mysql
 ifeq ($(USE_MYSQL),true)
+
+ifeq ($(MYSQL_USE_SYSTEM_LIBS),true)
+override INCLUDES += -I/usr/include/mysql
+override SERVER_LIBS += -lmysqlclient
+else
 override CXXFLAGS+= -DUSE_MYSQL -DDBUG_OFF
 override INCLUDES += -Imod/mysql/include -Imod/mysql/extlib/regex -Imod/mysql/mysys -Imod/mysql/vio
 
@@ -200,15 +222,25 @@ override SERVER_OBJS += $(foreach v,$(MYSQL_REGEX_OBJS),mod/mysql/$(MYSQL_REGEX_
 override SERVER_OBJS += $(foreach v,$(MYSQL_MYSYS_OBJS),mod/mysql/$(MYSQL_MYSYS_DIR)/$(v))
 override SERVER_OBJS += $(foreach v,$(MYSQL_VIO_OBJS),mod/mysql/$(MYSQL_VIO_DIR)/$(v))
 override SERVER_OBJS += $(foreach v,$(MYSQL_LIBMYSQL_OBJS),mod/mysql/$(MYSQL_LIBMYSQL_DIR)/$(v))
+endif
 override SERVER_OBJS += mod/mysql-standalone.o
 endif
 #end of mysql
 
 
 
-default: all
+default: release
 
-all: revision server
+release: release-flags 
+release-flags: override CXXFLAGS+=-O2 -s
+release-flags: build
+
+
+debug: debug-flags 
+debug-flags: override CXXFLAGS+=-O0 -g -DDEBUG -DDEBUG_SQL
+debug-flags: build
+
+build: revision server
 
 revision:
 SVNVERSION= $(shell svnversion -cn . 2>/dev/null | sed -e "s/.*://" -e "s/\([0-9]*\).*/\1/" | grep "[0-9]") 
@@ -217,15 +249,24 @@ override CXXFLAGS+= -DREMOD_VERSION="\"SVN build rev: $(SVNVERSION)\""
 endif
 
 enet/Makefile:
-	cd enet; chmod +x configure; ./configure --enable-shared=no --enable-static=yes
+	cd enet; autoreconf -vfi; ./configure --enable-shared=no --enable-static=yes
 	
 libenet: enet/Makefile
 	$(MAKE)	-C enet/ all
 
 clean-enet: enet/Makefile
-	$(MAKE) -C enet/ clean
+	$(MAKE) -C enet/ maintainer-clean
 
-clean:
+geoip/Makefile:
+	cd mod/GeoIP; chmod +x configure; ./configure --enable-shared=no --enable-static=yes
+
+libgeoip: geoip/Makefile
+	$(MAKE)	-C mod/GeoIP/libGeoIP/ all
+
+clean-geoip: geoip/Makefile
+	$(MAKE) -C mod/GeoIP/libGeoIP/ maintainer-clean
+
+clean: clean-enet
 	-$(RM) $(SERVER_OBJS) 
 
 %.h.gch: %.h
@@ -246,12 +287,13 @@ server: $(SERVER_OBJS)
 	$(CXX) $(CXXFLAGS) -o $(SERVER_NAME) $(SERVER_OBJS) $(SERVER_LIBS)
 
 else
+ifeq ($(ENET_USE_SYSTEM_LIBS),true)
+server:	$(SERVER_OBJS)
+	$(CXX) $(CXXFLAGS) -o $(SERVER_NAME) $(SERVER_OBJS) $(SERVER_LIBS)  
+	$(MV) $(SERVER_NAME) ../$(SERVER_NAME)
+else
 server:	libenet $(SERVER_OBJS)
 	$(CXX) $(CXXFLAGS) -o $(SERVER_NAME) $(SERVER_OBJS) $(SERVER_LIBS)  
-	
-ifneq (,$(STRIP))
-	$(STRIP) $(SERVER_NAME)
-endif
-
 	$(MV) $(SERVER_NAME) ../$(SERVER_NAME)
+endif
 endif

@@ -1,32 +1,12 @@
-#include "commandev.h"
-#include "fpsgame.h"
-#include "version.inc"
+#ifndef __IRC_H__
+#define __IRC_H__
 
-// remod
-#define mkstring(d) string d; d[0] = 0;
-#define RE_VERSION          "Remod $rev$"
-#define RE_VER_STR          REMOD_VERSION
-#define RE_NAME             "Remod"
-#define RE_UNAME            "remod"
-#define RE_RELEASE          "Dev"
-#define RE_URL              "http://code.google.com/p/remod-sauerbraten/"
-
-#ifdef WIN32
-#define RE_PLATFORM         "win"
-#elif defined(__APPLE__)
-#define RE_PLATFORM         "mac"
-#else
-#define RE_PLATFORM         "nix"
-#endif
-#define RE_ARCH             (8*sizeof(void *))
-
-enum { CON_MESG, CON_SELF, CON_GAMESPECIFIC };
-enum { CON_EVENT, CON_MAX, CON_LO, CON_HI, CON_IMPORTANT };
+#include "game.h"
 
 enum { IRCC_NONE = 0, IRCC_JOINING, IRCC_JOINED, IRCC_KICKED, IRCC_BANNED };
 enum { IRCCT_NONE = 0, IRCCT_AUTO };
 
-// remod
+//remod
 enum usermode
 {
     OP      = 1 << 1,
@@ -52,6 +32,10 @@ struct ircchan
     // remod
     vector<user> users;
 
+#ifndef STANDALONE
+    int updated;
+    ircbuf buffer;
+#endif
     ircchan() { reset(); }
     ~ircchan() { reset(); }
 
@@ -61,9 +45,10 @@ struct ircchan
         type = IRCCT_NONE;
         relay = lastjoin = lastsync = 0;
         name[0] = friendly[0] = passkey[0] = 0;
-
-        // remod
-        resetusers();
+#ifndef STANDALONE
+        updated = 0;
+        buffer.reset();
+#endif
     }
 
     // remod
@@ -114,10 +99,11 @@ struct ircchan
     }
 };
 enum { IRCT_NONE = 0, IRCT_CLIENT, IRCT_RELAY, IRCT_MAX };
-enum { IRC_NEW = 0, IRC_DISC, IRC_ATTEMPT, IRC_CONN, IRC_ONLINE, IRC_MAX };
+enum { IRC_NEW = 0, IRC_DISC, IRC_WAIT, IRC_ATTEMPT, IRC_CONN, IRC_ONLINE, IRC_QUIT, IRC_MAX };
+
 struct ircnet
 {
-    int type, state, port, lastattempt, inputcarry, inputlen;
+    int type, state, port, lastattempt, lastactivity, lastping, inputcarry, inputlen;
     string name, serv, nick, ip, passkey, authname, authpass;
     ENetAddress address;
     ENetSocket sock;
@@ -125,22 +111,30 @@ struct ircnet
     uchar input[4096];
 
     // remod
-    time_t lastping, lastpong;
+    time_t lastpong;
     char *authcmd;
+
 #ifndef STANDALONE
-    int updated;
+    int updated, lastseen, away;
     ircbuf buffer;
 #endif
 
-    ircnet() { reset(); }
-    ~ircnet() { reset(); }
+    ircnet() { reset(true); }
+    ~ircnet() { reset(true); }
 
-    void reset()
+    void reset(bool start = false)
     {
-        type = IRCT_NONE;
-        state = IRC_DISC;
+        if(start)
+        {
+            type = IRCT_NONE;
+            state = IRC_NEW;
+            sock = ENET_SOCKET_NULL;
+            address.host = ENET_HOST_ANY;
+            address.port = 6667;
+        }
+        else state = IRC_DISC;
         inputcarry = inputlen = 0;
-        port = lastattempt = 0;
+        port = lastattempt = lastactivity = lastping = 0;
         name[0] = serv[0] = nick[0] = ip[0] = passkey[0] = authname[0] = authpass[0] = 0;
         channels.shrink(0);
 
@@ -148,18 +142,15 @@ struct ircnet
         lastping = 0;
         lastpong = 0;
         authcmd = NULL;
+
 #ifndef STANDALONE
-        updated = 0;
+        updated = IRCUP_NEW;
+        lastseen = totalmillis;
+        away = 0;
         buffer.reset();
 #endif
     }
 };
-
-// remod
-extern usermode irc_user_state(char *nick);
-extern int connectwithtimeout(ENetSocket sock, const char *hostname, const ENetAddress &remoteaddress);
-extern bool resolverwait(const char *name, ENetAddress *address);
-void ping();
 
 extern vector<ircnet *> ircnets;
 
@@ -174,6 +165,14 @@ extern bool ircjoin(ircnet *n, ircchan *c);
 extern bool ircenterchan(ircnet *n, const char *name);
 extern bool ircnewchan(int type, const char *name, const char *channel, const char *friendly = "", const char *passkey = "", int relay = 0);
 extern void ircparse(ircnet *n);
-extern void ircdiscon(ircnet *n);
 extern void irccleanup();
+extern bool ircaddsockets(ENetSocket &maxsock, ENetSocketSet &readset, ENetSocketSet &writeset);
+extern void ircchecksockets(ENetSocketSet &readset, ENetSocketSet &writeset);
 extern void ircslice();
+
+//remod
+extern usermode irc_user_state(char *nick);
+extern bool resolverwait(const char *name, ENetAddress *address);
+void ping();
+void irc_checkserversockets();
+#endif // __IRC_H__

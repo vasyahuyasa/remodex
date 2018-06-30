@@ -1,0 +1,23 @@
+CXX = i686-w64-mingw32-g++
+STRIP = i686-w64-mingw32-strip
+PROG = authgen.exe
+
+CXXFLAGS = -s -O2 -DSTANDALONE -static
+INCLUDES = -I../../shared -I../../engine -I../../fpsgame -I../../enet/include -I../../include
+
+OBJS = authgen.o \
+	../../shared/crypto.o
+
+default: all
+
+all: $(OBJS) link
+
+%.o: %.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -c -o $@ $(subst .o,.cpp,$@) 
+
+clean:
+	rm -f $(OBJS)
+
+link:
+	$(CXX)  $(OBJS) $(LIBS) -o $(PROG)
+	$(STRIP) $(PROG)

@@ -15,10 +15,6 @@
 					<Add option="-fomit-frame-pointer" />
 					<Add option="-O2" />
 					<Add option="-Wall" />
-					<Add option="-DSTANDALONE" />
-					<Add option="-DIRC" />
-					<Add option="-DGEOIP" />
-					<Add option="-DSQLITE3" />
 					<Add option="-DNO_OLDNAMES" />
 					<Add option="-DDBUG_OFF" />
 					<Add option="-DHAVE_ULONG" />
@@ -54,12 +50,8 @@
 				<Compiler>
 					<Add option="-fomit-frame-pointer" />
 					<Add option="-Wall" />
-					<Add option="-DSTANDALONE" />
-					<Add option="-DIRC" />
-					<Add option="-DGEOIP" />
 					<Add option="-DGEOIPDATADIR" />
 					<Add option="-DHAS_SOCKLEN_T" />
-					<Add option="-DSQLITE3" />
 					<Add directory="enet/include" />
 					<Add directory="shared" />
 					<Add directory="include" />
@@ -79,43 +71,11 @@
 		</Build>
 		<Compiler>
 			<Add option="-Wall" />
+			<Add option="-DSTANDALONE" />
+			<Add option="-DIRC" />
+			<Add option="-DGEOIP" />
+			<Add option="-DSQLITE3" />
 		</Compiler>
-		<Unit filename="enet/callbacks.c">
-			<Option compilerVar="CC" />
-		</Unit>
-		<Unit filename="enet/compress.c">
-			<Option compilerVar="CC" />
-		</Unit>
-		<Unit filename="enet/host.c">
-			<Option compilerVar="CC" />
-		</Unit>
-		<Unit filename="enet/include/enet/callbacks.h" />
-		<Unit filename="enet/include/enet/enet.h" />
-		<Unit filename="enet/include/enet/list.h" />
-		<Unit filename="enet/include/enet/protocol.h" />
-		<Unit filename="enet/include/enet/time.h" />
-		<Unit filename="enet/include/enet/types.h" />
-		<Unit filename="enet/include/enet/unix.h" />
-		<Unit filename="enet/include/enet/utility.h" />
-		<Unit filename="enet/include/enet/win32.h" />
-		<Unit filename="enet/list.c">
-			<Option compilerVar="CC" />
-		</Unit>
-		<Unit filename="enet/packet.c">
-			<Option compilerVar="CC" />
-		</Unit>
-		<Unit filename="enet/peer.c">
-			<Option compilerVar="CC" />
-		</Unit>
-		<Unit filename="enet/protocol.c">
-			<Option compilerVar="CC" />
-		</Unit>
-		<Unit filename="enet/unix.c">
-			<Option compilerVar="CC" />
-		</Unit>
-		<Unit filename="enet/win32.c">
-			<Option compilerVar="CC" />
-		</Unit>
 		<Unit filename="engine/command.cpp" />
 		<Unit filename="engine/engine.h" />
 		<Unit filename="engine/server.cpp" />
@@ -133,7 +93,6 @@
 		<Unit filename="include/wincompat.h" />
 		<Unit filename="include/zconf.h" />
 		<Unit filename="include/zlib.h" />
-		<Unit filename="libGeoIP/GeoIP.h" />
 		<Unit filename="mod/banlist.cpp" />
 		<Unit filename="mod/banlist.h" />
 		<Unit filename="mod/commandev.cpp" />
@@ -163,13 +122,14 @@
 		<Unit filename="mod/db.h" />
 		<Unit filename="mod/geoipmod.cpp" />
 		<Unit filename="mod/geoipmod.h" />
+		<Unit filename="mod/geoipmod2.cpp" />
+		<Unit filename="mod/geoipmod2.h" />
 		<Unit filename="mod/irc.cpp" />
 		<Unit filename="mod/irc.h" />
+		<Unit filename="mod/irc_remod.h" />
 		<Unit filename="mod/jsonbanlist.cpp" />
 		<Unit filename="mod/jsonbanlist.h" />
-		<Unit filename="mod/libGeoIP/GeoIP.c">
-			<Option compilerVar="CC" />
-		</Unit>
+		<Unit filename="mod/mysql.cpp" />
 		<Unit filename="mod/mysql/extlib/regex/cclass.h" />
 		<Unit filename="mod/mysql/extlib/regex/cname.h" />
 		<Unit filename="mod/mysql/extlib/regex/debug.h" />

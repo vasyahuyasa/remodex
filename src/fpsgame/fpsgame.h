@@ -10,7 +10,7 @@ namespace server
     {
         int type;
         int spawntime;
-        char spawned;
+        bool spawned;
     };
 
     static const int DEATHMILLIS = 300;
@@ -136,13 +136,12 @@ namespace server
 
             timeplayed = 0;
             effectiveness = 0;
-
-            //remod
-            ext.reset();
-
             frags = flags = deaths = teamkills = shotdamage = damage = tokens = 0;
 
             lastdeath = 0;
+
+            //remod
+            ext.reset();
 
             respawn();
         }
@@ -255,7 +254,7 @@ namespace server
 
         enum
         {
-            PUSHMILLIS = 2500
+            PUSHMILLIS = 3000
         };
 
         int calcpushrange()
@@ -368,10 +367,10 @@ namespace server
 
     struct ban
     {
-        //Remod
-        int time;       // when ban was set
-        int expire;     // when ban expire
-        uint ip;        // victim ip
+        int time, expire;
+        uint ip;
+
+        //remod
         string name;    // victim name
         string actor;   // baning player's name (empty if by server)
         uint actorip;  // baning player's ip (0.0.0.0 if by server)
@@ -379,7 +378,7 @@ namespace server
 
     namespace aiman
     {
-        //Remod
+        //remod
         extern bool addai(int skill, int limit);
         extern bool deleteai();
 
@@ -400,6 +399,7 @@ namespace server
     #define MM_PRIVSERV (MM_MODE | MM_AUTOAPPROVE)
     #define MM_PUBSERV ((1<<MM_OPEN) | (1<<MM_VETO))
     #define MM_COOPSERV (MM_AUTOAPPROVE | MM_PUBSERV | (1<<MM_LOCKED))
+
     //Remod
     #define MM_CLANSERV ((1<<MM_OPEN) | (1<<MM_VETO) | (1<<MM_LOCKED))
 
@@ -466,10 +466,7 @@ namespace server
     extern servmode *smode;
 
     // remod
-    //extern vector<permban> permbans;
-    extern stream *mapdata;
-
-    void kickclients(uint ip, clientinfo *actor = NULL);
+    void kickclients(uint ip, clientinfo *actor = NULL, int priv = PRIV_NONE);
     clientinfo *getinfo(int n);
     const char *privname(int type);
     bool hasmap(clientinfo *ci);
@@ -484,7 +481,7 @@ namespace server
     void sendservmsg(const char *s);
     void srvmsgf(int cn, const char *s, ...);
     int numclients(int exclude , bool nospec, bool noai, bool priv);
-    const char *colorname(clientinfo *ci, char *name = NULL);
+    const char *colorname(clientinfo *ci, const char *name = NULL);
     void addgban(const char *name);
     void cleargbans();
 
@@ -494,5 +491,4 @@ namespace server
     void spawnstate(clientinfo *ci);
     void sendspawn(clientinfo *ci);
 }
-
 #endif

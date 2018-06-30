@@ -3,7 +3,7 @@
 * date:     2013
 * author:   degrave
 *
-* remot control via telnet
+* remote control via telnet
 */
 
 #include <stdio.h>
@@ -199,7 +199,13 @@ void rconserver_tcp::update()
                         rconpeers.remove(i);
                         conoutf("Rcon: quit [%s:%i]", inet_ntoa(peer.addr.sin_addr), ntohs(peer.addr.sin_port));
                     }
-                    else execute(buf);
+                    else
+                    {
+                        char cubebuf[MAXBUF];
+                        memset(cubebuf, 0, MAXBUF);
+                        decodeutf8((uchar*)cubebuf, MAXBUF, (uchar*)buf, nbytes, 0);
+                        execute(buf);
+                    }
                 }
                 else
                 {
@@ -232,6 +238,10 @@ void rconserver_tcp::sendmsg(const char *msg, int len)
     {
         data = newstring(msg);
     }
+
+    char utfbuf[MAXBUF];
+    memset(utfbuf, 0, MAXBUF);
+    len = encodeutf8((uchar*)utfbuf, MAXBUF, (uchar*)data, len, 0);
 
     // send text
     loopv(rconpeers)
