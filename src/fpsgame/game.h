@@ -3,12 +3,9 @@
 
 #include "cube.h"
 
-<<<<<<< HEAD
 // remodex
 #include "remodex.h"
 
-=======
->>>>>>> remod/master
 // console message types
 
 enum

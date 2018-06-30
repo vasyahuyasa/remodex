@@ -68,13 +68,10 @@ namespace server
     VAR(overtime, 0, 0, 600);
     VAR(nodamage, 0, 0, 1);
 
-<<<<<<< HEAD
     // remodex
     VAR(arenamode, 0, 0, 1);    // spawn when last man standing
     VAR(zombiemode, 0, 0, 1);   // zombies!!11 o,.,o
 
-=======
->>>>>>> remod/master
     vector<uint> allowedips;
     vector<ban> bannedips;
 
