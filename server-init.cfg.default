@@ -280,6 +280,8 @@ exec "scripts/modules/syncauth.cfg"
 // Execute module
 exec "scripts/modules/spy.cfg"
 
+// Remodex
+exec "scripts/modules/midair.cfg"
 
 // -------------------------------------
 // COMMANDS
