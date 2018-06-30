@@ -477,9 +477,9 @@ void writebans()
 // (c) 2011 Thomas
 bool loadents(const char *fname, vector<entity> &ents, uint *crc)
 {
-    string mapname, ogzname, entsname;
-    copystring(mapname, fname, 100);
-    cutogz(mapname);
+    string ogzname, entsname;
+    char * mapname = newstring(fname);
+    fixmapname(mapname);
     formatstring(ogzname, "%s/%s.ogz", remod::mapdir, mapname);
     formatstring(entsname, "%s/%s.ents", remod::mapdir, mapname);
     path(ogzname);
@@ -965,6 +965,10 @@ done:
     #define FLOODTRIGGERTIME 10000
     bool checkflood(clientinfo *ci, int type)
     {
+        // remod TODO: fix this function
+        // server muted after 21 day of uptime
+        return false;
+
         bool isflood = false;
         size_t floodmsg = floodtype(type);
         floodstate &fs = ci->state.ext.flood[floodmsg];

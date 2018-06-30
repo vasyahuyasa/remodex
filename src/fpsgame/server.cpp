@@ -68,10 +68,13 @@ namespace server
     VAR(overtime, 0, 0, 600);
     VAR(nodamage, 0, 0, 1);
 
+<<<<<<< HEAD
     // remodex
     VAR(arenamode, 0, 0, 1);    // spawn when last man standing
     VAR(zombiemode, 0, 0, 1);   // zombies!!11 o,.,o
 
+=======
+>>>>>>> remod/master
     vector<uint> allowedips;
     vector<ban> bannedips;
 
@@ -1948,10 +1951,7 @@ namespace server
     void dodamage(clientinfo *target, clientinfo *actor, int damage, int gun, const vec &hitpush = vec(0, 0, 0))
     {
         // remod
-        if(m_edit && nodamage == 1)
-        {
-            return;
-        }
+        if(m_edit && nodamage == 1) return;
 
         /// remodex
         // self and team damage
@@ -3229,6 +3229,7 @@ namespace server
             {
                 getstring(text, p);
                 filtertext(text, text, false);
+                fixmapname(text);
                 int reqmode = getint(p);
                 vote(text, reqmode, sender);
                 break;
