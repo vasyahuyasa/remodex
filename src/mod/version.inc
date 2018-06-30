@@ -35,9 +35,9 @@
 #endif
 
 #ifndef REMOD_URL
-#define REMOD_URL "https://github.com/vasyahuyasa/remod-sauerbraten"
+#define REMOD_URL "https://github.com/vasyahuyasa/remodex"
 #endif
 
 #ifndef MOD_NAME
-#define MOD_NAME "Remod"
+#define MOD_NAME "Remodex"
 #endif

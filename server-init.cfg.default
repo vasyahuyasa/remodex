@@ -70,8 +70,9 @@ serverbotlimit 8
 // 3 - auth server, mastermode 3 disabled for non admins
 publicserver 3
 
+// Remodex diff
 // Update master server with your one (you want to see your server in the server browser) 
-updatemaster 1
+updatemaster 0
 
 // optional specific IP for server to use
 // serverip N.N.N.N
@@ -154,7 +155,7 @@ imissiontime 10000
 // time limit for every round (0 - don't change, in game #gtime)
 roundtime 0
 
-// not shuffle teams (in game #persist)
+// persistent teams (in game #persist)
 persist 0 
 
 // character before player command
@@ -280,7 +281,7 @@ exec "scripts/modules/syncauth.cfg"
 // Execute module
 exec "scripts/modules/spy.cfg"
 
-// Remodex
+// Remodex diff
 exec "scripts/modules/midair.cfg"
 
 // -------------------------------------
