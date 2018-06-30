@@ -30,7 +30,7 @@ STRIP=
 #WINDRES=i486-mingw32-windres
 WINDRES=i686-w64-mingw32-windres
 
-SERVER_NAME=remod.exe
+SERVER_NAME=remodex.exe
 
 CXXFLAGS= -fpermissive -fomit-frame-pointer -Wall -fsigned-char -DSTANDALONE -static -Wl,-subsystem,windows
 SERVER_INCLUDES= -I/usr/i686-w64-mingw32/include/ $(INCLUDES) 
@@ -76,7 +76,10 @@ SERVER_OBJS= \
 	mod/cryptomod/polarssl/library/sha2-standalone.o \
 	mod/cryptomod/polarssl/library/sha4-standalone.o \
     mod/banlist-standalone.o \
-	mod/jsonbanlist-standalone.o
+	mod/jsonbanlist-standalone.o \
+	mod/remodex-standalone.o \
+	mod/arena-standalone.o \
+	mod/zombie-standalone.o
 
 
 
