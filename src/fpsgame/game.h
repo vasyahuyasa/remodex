@@ -3,6 +3,9 @@
 
 #include "cube.h"
 
+// remodex
+#include "remodex.h"
+
 // console message types
 
 enum
@@ -509,6 +512,37 @@ struct fpsstate
             armour = 25;
             ammo[GUN_PISTOL] = 40;
             ammo[GUN_GL] = 1;
+        }
+
+        // remodex
+        // ammo
+        loopi(NUMGUNS)
+        {
+            if(remodex::getammo(i) > -1)
+            {
+                ammo[i] = remodex::getammo(i);
+            }
+        }
+        ammo[GUN_FIST] = 1;
+        // armour
+        if(remodex::getarmourtype() > -1)
+        {
+            armourtype = remodex::getarmourtype();
+        }
+        if(remodex::getarmour() > -1)
+        {
+            armour = remodex::getarmour();
+        }
+        // health
+        if(remodex::gethealth() > 0)
+        {
+            maxhealth = remodex::gethealth();
+            health = remodex::gethealth();
+        }
+        // gunselect
+        if(remodex::getgunselect() > -1)
+        {
+            gunselect = remodex::getgunselect();
         }
     }
 

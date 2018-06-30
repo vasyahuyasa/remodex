@@ -41,7 +41,7 @@ ifneq (,$(findstring amd64,$(shell uname -a)))
 PLATFORM_SUFFIX=64
 endif
 
-SERVER_PREFIX=remod
+SERVER_PREFIX=remodex
 SERVER_NAME=$(SERVER_PREFIX)
 ifneq (,$(findstring MINGW,$(PLATFORM)))
 SERVER_NAME=$(SERVER_NAME)$(PLATFORM_SUFFIX).exe
@@ -100,8 +100,10 @@ SERVER_OBJS= \
 	mod/cryptomod/polarssl/library/sha2-standalone.o \
 	mod/cryptomod/polarssl/library/sha4-standalone.o \
       	mod/banlist-standalone.o \
-	mod/jsonbanlist-standalone.o
-
+	mod/jsonbanlist-standalone.o \
+	mod/remodex-standalone.o \
+	mod/arena-standalone.o \
+	mod/zombie-standalone.o
 
 ### Options checks
 

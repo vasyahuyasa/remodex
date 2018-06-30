@@ -484,5 +484,11 @@ namespace server
     const char *colorname(clientinfo *ci, const char *name = NULL);
     void addgban(const char *name);
     void cleargbans();
+
+    //Remodex
+    void flushevents(clientinfo *ci, int millis);
+    void cleartimedevents(clientinfo *ci);
+    void spawnstate(clientinfo *ci);
+    void sendspawn(clientinfo *ci);
 }
 #endif

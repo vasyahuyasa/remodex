@@ -5,6 +5,10 @@
 #include "fpsgame.h"
 #include "remod.h"
 
+// remodex
+#include "arena.h"
+#include "zombie.h"
+
 namespace game
 {
     void parseoptions(vector<const char *> &args)
@@ -63,6 +67,10 @@ namespace server
     VAR(packetdelay, 10, 33, 33);
     VAR(overtime, 0, 0, 600);
     VAR(nodamage, 0, 0, 1);
+
+    // remodex
+    VAR(arenamode, 0, 0, 1);    // spawn when last man standing
+    VAR(zombiemode, 0, 0, 1);   // zombies!!11 o,.,o
 
     vector<uint> allowedips;
     vector<ban> bannedips;
@@ -1482,6 +1490,14 @@ namespace server
     {
         gamestate &gs = ci->state;
         gs.spawnstate(gamemode);
+
+        // Remodex
+        // take ammo and set health
+        if(zombiemode && remodex::iszombie(ci))
+        {
+            remodex::zombiestate(ci);
+        } 
+
         gs.lifesequence = (gs.lifesequence + 1)&0x7F;
     }
 
@@ -1923,10 +1939,49 @@ namespace server
 
     void startintermission() { gamelimit = min(gamelimit, gamemillis); checkintermission(); }
 
+    // remodex
+    VAR(selfdamage, 0, 1, 1);
+    VAR(friendlyfire, 0, 1, 1);
+    VAR(midair, 0, 0, 1);
+    VAR(midairbase, 0, 0, INT_MAX);
+
     void dodamage(clientinfo *target, clientinfo *actor, int damage, int gun, const vec &hitpush = vec(0, 0, 0))
     {
         // remod
-        if(m_edit && nodamage == 1) return;
+        if(m_edit && nodamage == 1)
+        {
+            return;
+        }
+
+        /// remodex
+        // self and team damage
+        if(actor==target)
+        {
+            if(!selfdamage)
+            {
+                damage = 0;
+            }                
+        }
+        else
+        {
+            if(m_teammode && !friendlyfire && (strcmp(target->team, actor->team) == -1))
+            {
+                damage = 0;
+            }                
+
+            // midair and 120 - maximum rocket damage
+            if(midair && gun==GUN_RL && damage==120 && target->state.o.z >= midairbase)
+            {
+                damage = target->state.health;                
+            }
+        }
+        // damage scale
+        if(remodex::getdamagescale(gun) > -1)
+        {
+            damage = damage*remodex::getdamagescale(gun);
+        }            
+        /// ^end remodex
+
         actor->state.ext.guninfo[gun].damage += damage;
 
         gamestate &ts = target->state;
@@ -2215,6 +2270,9 @@ namespace server
                 }
                 aiman::checkai();
                 if(smode) smode->update();
+
+                // remodex
+                if(arenamode) remodex::arenamodeupdate();
             }
         }
 
@@ -3618,7 +3676,11 @@ namespace server
     int laninfoport() { return SAUERBRATEN_LANINFO_PORT; }
     int serverinfoport(int servport) { return servport < 0 ? SAUERBRATEN_SERVINFO_PORT : servport+1; }
     int serverport(int infoport) { return infoport < 0 ? SAUERBRATEN_SERVER_PORT : infoport-1; }
-    const char *defaultmaster() { return "master.sauerbraten.org"; }
+    
+    // remodex
+    //const char *defaultmaster() { return "master.sauerbraten.org"; }
+    const char *defaultmaster() { return ""; }
+    
     int masterport() { return SAUERBRATEN_MASTER_PORT; }
     int numchannels() { return 3; }
 

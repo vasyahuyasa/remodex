@@ -52,7 +52,7 @@ db_init
 serverident = ""
 
 // Server description and server's name
-serverdesc "rb11.butchers.su"
+serverdesc "remodex server"
 
 // Message of the day
 servermotd  "Message of the day"

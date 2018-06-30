@@ -1,11 +1,11 @@
 [Unit]
-Description=Sauerbraten server mod
+Description=Sauerbraten server mod (remodex)
 After=network.target
 
 [Service]
 Type=forking
-PIDFile=/run/remod.pid
-ExecStart=/usr/bin/remod -p/run/remod.pid -q/opt/remod -gserver.log -d
+PIDFile=/run/remodex.pid
+ExecStart=/usr/bin/remodex -p/run/remodex.pid -q/opt/remodex -gserver.log -d
 
 [Install]
 WantedBy=multi-user.target
