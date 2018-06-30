@@ -1948,10 +1948,7 @@ namespace server
     void dodamage(clientinfo *target, clientinfo *actor, int damage, int gun, const vec &hitpush = vec(0, 0, 0))
     {
         // remod
-        if(m_edit && nodamage == 1)
-        {
-            return;
-        }
+        if(m_edit && nodamage == 1) return;
 
         /// remodex
         // self and team damage
@@ -3229,6 +3226,7 @@ namespace server
             {
                 getstring(text, p);
                 filtertext(text, text, false);
+                fixmapname(text);
                 int reqmode = getint(p);
                 vote(text, reqmode, sender);
                 break;
