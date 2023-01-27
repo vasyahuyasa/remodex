@@ -2,9 +2,13 @@
 // runs dedicated or as client coroutine
 
 #include "engine.h"
+
+// remod headers
 #include "rconmod.h"
 #include "remod.h"
 #include "commandev.h"
+#include "discordmod.h"
+#include "authservers.h"
 
 #ifdef IRC
 #include "irc.h"
@@ -71,12 +75,12 @@ static void writelogv(FILE *file, const char *fmt, va_list args)
     vformatstring(buf, fmt, args, sizeof(buf));
     writelog(file, buf);
 }
-
+ 
 #ifdef STANDALONE
-void fatal(const char *fmt, ...)
-{
+void fatal(const char *fmt, ...) 
+{ 
     void cleanupserver();
-    cleanupserver();
+    cleanupserver(); 
 	defvformatstring(msg,fmt,fmt);
 	if(logfile) logoutf("%s", msg);
 #ifdef WIN32
@@ -85,7 +89,7 @@ void fatal(const char *fmt, ...)
     fprintf(stderr, "server error: %s\n", msg);
 #endif
     closelogfile();
-    exit(EXIT_FAILURE);
+    exit(EXIT_FAILURE); 
 }
 
 void conoutfv(int type, const char *fmt, va_list args)
@@ -101,21 +105,6 @@ void conoutfv(int type, const char *fmt, va_list args)
     remod::rcon::sendmsg(buf);
 }
 
-void conoutf(const char *fmt, ...)
-{
-    va_list args;
-    va_start(args, fmt);
-    conoutfv(CON_INFO, fmt, args);
-    va_end(args);
-}
-
-void conoutf(int type, const char *fmt, ...)
-{
-    va_list args;
-    va_start(args, fmt);
-    conoutfv(type, fmt, args);
-    va_end(args);
-}
 #endif
 
 #define DEFAULTCLIENTS 8
@@ -134,7 +123,7 @@ struct client                   // server side version of "dynent" type
 vector<client *> clients;
 
 ENetHost *serverhost = NULL;
-int laststatus = 0;
+int laststatus = 0; 
 ENetSocket pongsock = ENET_SOCKET_NULL, lansock = ENET_SOCKET_NULL;
 
 int localclients = 0, nonlocalclients = 0;
@@ -252,7 +241,7 @@ ENetPacket *sendf(int cn, int chan, const char *format, ...)
             break;
         }
 
-        case 'i':
+        case 'i': 
         {
             int n = isdigit(*format) ? *format++-'0' : 1;
             loopi(n) putint(p, va_arg(args, int));
@@ -344,15 +333,15 @@ void disconnect_client(int n, int reason)
     if(!clients.inrange(n) || clients[n]->type!=ST_TCPIP) return;
     enet_peer_disconnect(clients[n]->peer, reason);
     server::clientdisconnect(n);
+    delclient(clients[n]);
     const char *msg = disconnectreason(reason);
     string s;
-    if(msg) formatstring(s, "client (%s) disconnected because: %s", ((server::clientinfo *)(clients[n]->info))->name, msg);
-    else formatstring(s, "client (%s) disconnected", ((server::clientinfo *)(clients[n]->info))->name);
+    if(msg) formatstring(s, "client (%s) disconnected because: %s", clients[n]->hostname, msg);
+    else formatstring(s, "client (%s) disconnected", clients[n]->hostname);
     logoutf("%s", s);
 
-    delclient(clients[n]);
-
     // remod
+    // server::sendservmsg(s);
     if(!(!ipbanmsg && reason == DISC_IPBAN)) server::sendservmsg(s);
 }
 
@@ -396,7 +385,7 @@ VARN(updatemaster, allowupdatemaster, 0, 1, 1);
 
 void disconnectmaster()
 {
-    if(mastersock != ENET_SOCKET_NULL)
+    if(mastersock != ENET_SOCKET_NULL) 
     {
         server::masterdisconnected();
         enet_socket_destroy(mastersock);
@@ -473,7 +462,7 @@ void processmasterinput()
     char *input = &masterin[masterinpos], *end = (char *)memchr(input, '\n', masterin.length() - masterinpos);
     while(end)
     {
-        *end++ = '\0';
+        *end = '\0';
 
         const char *args = input;
         while(args < end && !iscubespace(*args)) args++;
@@ -486,10 +475,11 @@ void processmasterinput()
             conoutf("master server registration succeeded");
         else server::processmasterinput(input, cmdlen, args);
 
+        end++;
         masterinpos = end - masterin.getbuf();
         input = end;
         end = (char *)memchr(input, '\n', masterin.length() - masterinpos);
-    }
+    } 
 
     if(masterinpos >= masterin.length())
     {
@@ -565,6 +555,15 @@ void checkserversockets()        // reply all server info requests
         ENET_SOCKETSET_ADD(readset, mastersock);
         if(!masterconnected) ENET_SOCKETSET_ADD(writeset, mastersock);
     }
+    // remod: check auth servers sockets
+    enumerate(remod::auth::servers, remod::auth::authserver, a, {
+        if(a.sock != ENET_SOCKET_NULL)
+        {
+            maxsock = max(maxsock, a.sock);
+            ENET_SOCKETSET_ADD(readset, a.sock);
+            if(!a.connected) ENET_SOCKETSET_ADD(writeset, a.sock);
+        }
+    });
     if(lansock != ENET_SOCKET_NULL)
     {
         maxsock = max(maxsock, lansock);
@@ -592,8 +591,8 @@ void checkserversockets()        // reply all server info requests
     {
         if(!masterconnected)
         {
-            if(ENET_SOCKETSET_CHECK(readset, mastersock) || ENET_SOCKETSET_CHECK(writeset, mastersock))
-            {
+            if(ENET_SOCKETSET_CHECK(readset, mastersock) || ENET_SOCKETSET_CHECK(writeset, mastersock)) 
+            { 
                 int error = 0;
                 if(enet_socket_get_option(mastersock, ENET_SOCKOPT_ERROR, &error) < 0 || error)
                 {
@@ -602,14 +601,38 @@ void checkserversockets()        // reply all server info requests
                 }
                 else
                 {
-                    masterconnecting = 0;
-                    masterconnected = totalmillis ? totalmillis : 1;
-                    server::masterconnected();
+                    masterconnecting = 0; 
+                    masterconnected = totalmillis ? totalmillis : 1; 
+                    server::masterconnected(); 
                 }
             }
         }
         if(mastersock != ENET_SOCKET_NULL && ENET_SOCKETSET_CHECK(readset, mastersock)) flushmasterinput();
     }
+    // remod
+    enumerate(remod::auth::servers, remod::auth::authserver, a, {
+        if(a.sock != ENET_SOCKET_NULL)
+        {
+            if(!a.connected)
+            {
+                if(ENET_SOCKETSET_CHECK(readset, a.sock) || ENET_SOCKETSET_CHECK(writeset, a.sock))
+                {
+                    int error = 0;
+                    if(enet_socket_get_option(a.sock, ENET_SOCKOPT_ERROR, &error) < 0 || error)
+                    {
+                        logoutf("could not connect to auth server, error: %d", error);
+                        a.disconnect();
+}
+                    else
+                    {
+                        a.connecting = 0;
+                        a.connected = totalmillis ? totalmillis : 1;
+                    }
+                }
+            }
+            if(a.sock != ENET_SOCKET_NULL && ENET_SOCKETSET_CHECK(readset, a.sock)) a.flushinput();
+        }
+    });
 }
 
 VAR(serveruprate, 0, 0, INT_MAX);
@@ -617,7 +640,9 @@ SVAR(serverip, "");
 VARF(serverport, 0, server::serverport(), 0xFFFF-1, { if(!serverport) serverport = server::serverport(); });
 
 #ifdef STANDALONE
+// remod totalmillis removed
 int curtime = 0, lastmillis = 0, elapsedtime = 0;
+
 // remod
 _VAR(totalmillis, totalmillis, 0, 0, INT_MAX, IDF_READONLY);
 #endif
@@ -634,7 +659,7 @@ uint totalsecs = 0;
 void updatetime()
 {
     static int lastsec = 0;
-    if(totalmillis - lastsec >= 1000)
+    if(totalmillis - lastsec >= 1000) 
     {
         int cursecs = (totalmillis - lastsec) / 1000;
         totalsecs += cursecs;
@@ -644,16 +669,16 @@ void updatetime()
 
 void serverslice(bool dedicated, uint timeout)   // main server update, called from main loop in sp, or from below in dedicated server
 {
-    if(!serverhost)
+    if(!serverhost) 
     {
         server::serverupdate();
         server::sendpackets();
         return;
     }
-
+       
     // below is network only
 
-    if(dedicated)
+    if(dedicated) 
     {
         int millis = (int)enet_time_get();
         elapsedtime = millis - totalmillis;
@@ -669,14 +694,16 @@ void serverslice(bool dedicated, uint timeout)   // main server update, called f
     server::serverupdate();
 
     flushmasteroutput();
+    // remod
+    enumerate(remod::auth::servers, remod::auth::authserver, a, { a.flushoutput(); });
     checkserversockets();
 
     if(!lastupdatemaster || totalmillis-lastupdatemaster>60*60*1000)       // send alive signal to masterserver every hour of uptime
         updatemasterserver();
-
+    
     if(totalmillis-laststatus>60*1000)   // display bandwidth stats, useful for server ops
     {
-        laststatus = totalmillis;
+        laststatus = totalmillis;     
         if(nonlocalclients || serverhost->totalSentData || serverhost->totalReceivedData) logoutf("status: %d remote clients, %.1f send, %.1f rec (K/sec)", nonlocalclients, serverhost->totalSentData/60.0f/1024, serverhost->totalReceivedData/60.0f/1024);
         serverhost->totalSentData = serverhost->totalReceivedData = 0;
     }
@@ -711,7 +738,7 @@ void serverslice(bool dedicated, uint timeout)   // main server update, called f
                 if(event.packet->referenceCount==0) enet_packet_destroy(event.packet);
                 break;
             }
-            case ENET_EVENT_TYPE_DISCONNECT:
+            case ENET_EVENT_TYPE_DISCONNECT: 
             {
                 client *c = (client *)event.peer->data;
                 if(!c) break;
@@ -736,7 +763,7 @@ void flushserver(bool force)
 void localdisconnect(bool cleanup)
 {
     bool disconnected = false;
-    loopv(clients) if(clients[i]->type==ST_LOCAL)
+    loopv(clients) if(clients[i]->type==ST_LOCAL) 
     {
         server::localdisconnect(i);
         delclient(clients[i]);
@@ -749,6 +776,7 @@ void localdisconnect(bool cleanup)
 
 void localconnect()
 {
+    if(initing) return;
     client &c = addclient(ST_LOCAL);
     copystring(c.hostname, "local");
     game::gameconnect(false);
@@ -850,7 +878,7 @@ static void writeline(logline &line)
         size_t numu = encodeutf8(ubuf, sizeof(ubuf), &((uchar *)line.buf)[carry], len - carry, &carry);
         DWORD written = 0;
         WriteConsole(outhandle, ubuf, numu, &written, NULL);
-    }
+    }     
 }
 
 static void setupconsole()
@@ -910,7 +938,7 @@ static LRESULT CALLBACK handlemessages(HWND hWnd, UINT uMsg, WPARAM wParam, LPAR
                     break;
 				case MENU_SHOWCONSOLE:
 					ShowWindow(conwindow, SW_SHOWNORMAL);
-					ModifyMenu(appmenu, 0, MF_BYPOSITION|MF_STRING, MENU_HIDECONSOLE, "Hide Console");
+					ModifyMenu(appmenu, 0, MF_BYPOSITION|MF_STRING, MENU_HIDECONSOLE, "Hide Console"); 
 					break;
 				case MENU_HIDECONSOLE:
 					ShowWindow(conwindow, SW_HIDE);
@@ -956,7 +984,7 @@ static void setupwindow(const char *title)
 	wc.cbClsExtra = 0;
 	wndclass = RegisterClass(&wc);
 	if(!wndclass) fatal("failed registering window class");
-
+	
 	appwindow = CreateWindow(MAKEINTATOM(wndclass), title, 0, CW_USEDEFAULT, CW_USEDEFAULT, 0, 0, HWND_MESSAGE, NULL, appinstance, NULL);
 	if(!appwindow) fatal("failed creating window");
 
@@ -984,7 +1012,7 @@ static char *parsecommandline(const char *src, vector<char *> &args)
     args.add(NULL);
     return buf;
 }
-
+                
 
 int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR szCmdLine, int sw)
 {
@@ -996,7 +1024,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR szCmdLine, int sw)
     int status = standalonemain(args.length()-1, args.getbuf());
     #define main standalonemain
 #else
-    SDL_SetModuleHandle(hInst);
+    SDL_SetMainReady();
     int status = SDL_main(args.length()-1, args.getbuf());
 #endif
     delete[] buf;
@@ -1050,14 +1078,14 @@ void rundedicatedserver()
 		}
 		serverslice(true, 5);
 
-		//remod
+        //remod
 		remod::rcon::update();
-        	#ifdef IRC
-        	irc_checkserversockets();
-        	ircslice();
-        	#endif
-        	remod::checkresume();
-        	remod::eventsupdate();
+        #ifdef IRC
+        irc_checkserversockets();
+        ircslice();
+        #endif
+        remod::checkresume();
+        remod::eventsupdate();
 	}
 #else
     // remod
@@ -1089,7 +1117,7 @@ bool servererror(bool dedicated, const char *desc)
         fatal("%s", desc);
     return false;
 }
-
+  
 bool setuplistenserver(bool dedicated)
 {
     ENetAddress address = { ENET_HOST_ANY, enet_uint16(serverport <= 0 ? server::serverport() : serverport) };
@@ -1128,13 +1156,13 @@ SVAR(initcfg, "");
 
 void initserver(bool listen, bool dedicated)
 {
-    if(dedicated)
+    if(dedicated) 
     {
 #ifdef WIN32
         setupwindow("Cube 2: Sauerbraten server");
 #endif
     }
-
+    
     // remod
     if(strcmp(initcfg, "") == 0)
     {
@@ -1180,12 +1208,12 @@ void startlistenserver(int *usemaster)
     if(serverhost) { conoutf(CON_ERROR, "listen server is already running"); return; }
 
     allowupdatemaster = *usemaster>0 ? 1 : 0;
-
+ 
     if(!setuplistenserver(false)) return;
-
+    
     updatemasterserver();
-
-    conoutf("listen server started for %d clients%s", maxclients, allowupdatemaster ? " and listed with master server" : "");
+   
+    conoutf("listen server started for %d clients%s", maxclients, allowupdatemaster ? " and listed with master server" : ""); 
 }
 COMMAND(startlistenserver, "i");
 
@@ -1269,7 +1297,7 @@ bool serveroption(char *opt)
         case 'u': setvar("serveruprate", atoi(opt+2)); return true;
         case 'c': setvar("maxclients", atoi(opt+2)); return true;
         case 'i': setsvar("serverip", opt+2); return true;
-        case 'j': setvar("serverport", atoi(opt+2)); return true;
+        case 'j': setvar("serverport", atoi(opt+2)); return true; 
         case 'm': setsvar("mastername", opt+2); setvar("updatemaster", mastername[0] ? 1 : 0); return true;
 #ifdef STANDALONE
         case 'q': logoutf("Using home directory: %s", opt); sethomedir(opt+2); return true;
@@ -1293,7 +1321,7 @@ vector<const char *> gameargs;
 
 #ifdef STANDALONE
 int main(int argc, char **argv)
-{
+{   
     setlogfile(NULL);
     if(enet_initialize()<0) fatal("Unable to initialise network module");
     atexit(enet_deinitialize);

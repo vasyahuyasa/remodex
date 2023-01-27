@@ -1,2 +1,17 @@
+# Ignore binary files
+remod
 remod64
 remodex64
+
+# Ignore anything compiled
+*.o
+*.a
+
+# config
+server-init.cfg
+
+# unnecessary
+.vscode
+.deps
+.libs
+src/mod/discord/discord.so
