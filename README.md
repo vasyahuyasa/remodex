@@ -7,36 +7,51 @@ The goal of project is create lightweight crossplatform (FreeBSD, Linux, Windows
 Nightly builds (Linux and win32 packages) available here: http://remod.butchers.su/.
 
 ## Download
+
   * Latest development version: https://github.com/vasyahuyasa/remod-sauerbraten/releases
   * GIT repository: https://github.com/vasyahuyasa/remod-sauerbraten
+ 
+## Docker
+
+https://hub.docker.com/r/vasyahuyasa/remod
 
 ## Installation notes and some guides
 ```
 git clone https://github.com/vasyahuyasa/remod-sauerbraten.git
 cd remod-sauerbraten
-git submodule init
-git submodule update
 cd src
 make
 ```
-  * Check our [wiki page](https://github.com/vasyahuyasa/remod-sauerbraten/wiki/Installation)
+
+ * Check our [wiki page](https://github.com/vasyahuyasa/remod-sauerbraten/wiki/Installation)
+
+## GeoIP database
+
+Remod support geoip2 and legacy geoip database format (geolite country). Instruction how to get fresh copy of databse https://dev.maxmind.com/geoip/geoipupdate/
 
 ## Implemented features
-  * server side cubescript
-  * remote control, access to serverside cubescript (via tcp, udp and netcat)
-  * new cubescript functions
-  * GeoIP support
-  * IRC bot
-  * cubescript events
-  * user #commands
-  * irc bot user commands
-  * save and load maps to local file system in coopedit mode
-  * database (sqlite3, mysql)
+  * [x] server side cubescript
+  * [x] remote control, access to serverside cubescript (via tcp, udp and netcat)
+  * [x] new cubescript functions
+  * [x] GeoIP support
+  * [x] IRC bot
+  * [x] cubescript events
+  * [x] user #commands
+  * [x] irc bot user commands
+  * [x] save and load maps to local file system in coopedit mode
+  * [x] database (sqlite3, mysql)
+  * [x] docker
+  * [x] discord relay
 
-## Work in progress
-  * users system
-  * scoreboard
-  * anticheat
+## Work in progress   
+  * [ ] docker-compose / documentation
+
+## backlog
+  * [ ] discord bot
+  * [ ] some kind of rpc
+  * [ ] anticheat
+  * [ ] users system
+  * [ ] scoreboard
 
 ## Supported platforms
   * Mac (cmake, Xcode)
@@ -47,3 +62,4 @@ make
 ## Contacts
   * [degrave](https://github.com/vasyahuyasa), [^o_o^](https://github.com/rmhmlhr)
   * IRC: irc://irc.gamesurge.net/rb
+  * Discord [degrave@sauerworld](https://discord.gg/rfptFpx)

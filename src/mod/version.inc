@@ -1,11 +1,11 @@
 // version, change on release
 #ifndef REMOD_VERSION
-#define REMOD_VERSION "v1.1.4"
+#define REMOD_VERSION "v1.3.2"
 #endif
 
 // codename
 #ifndef REMOD_CODENAME
-#define REMOD_CODENAME "\"Sasha Grey\""
+#define REMOD_CODENAME "\"Corona 20\""
 #endif
 
 // system

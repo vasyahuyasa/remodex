@@ -1,80 +1,51 @@
-########### CONFIGURATION ############
-
-#Use geoip module?  true|false 
 USE_GEOIP=true
-
-#Use irc bot? true|false
 USE_IRCBOT=true
-
-#Sqlite3 support? true|false
 USE_SQLITE3=true
 SQLITE3_USE_SYSTEM_LIBS=false
-
-#Mysql support? true|false
 USE_MYSQL=true
 MYSQL_USE_SYSTEM_LIBS=false
+USE_EXPEREMENTAL_DISCORD=false
 
-#Use ssytem enet libraryie
-ENET_USE_SYSTEM_LIBS=false
-######################################
+CXXFLAGS=-O3 -fomit-frame-pointer -DSTANDALONE
+override CXXFLAGS+= -Wall -fsigned-char -fno-exceptions -fno-rtti
 
-### Tools
-CXX=gcc
-MV=mv
-STRIP=strip
+INCLUDES= -Ienet/include -Ishared -Iengine -Ifpsgame -Imod -Imod/hashlib2plus/src -Imod/cryptomod/polarssl/include
 
+STRIP?=strip
 
-PLATFORM=$(shell uname -s)
+PLATFORM?=x86_64-pc-linux-gnu
+TARGETHOST=x86_64-pc-linux-gnu
 
-# Use clang on freebsd
-# Comment next lines if server not building or you want to use old GCC
-ifneq (,$(findstring FreeBSD,$(PLATFORM)))
-CXX=clang
+ifneq (,$(findstring MINGW,$(PLATFORM)))
+    ifneq (,$(findstring 64,$(PLATFORM)))
+        WINDRES=x86_64-w64-mingw32-windres
+        STRIP=x86_64-w64-mingw32-strip
+        WINLIB=lib64
+		override CXX+= -m64
+        override WINDRES+= -F pe-x86-64
+    else
+        WINDRES=i686-w64-mingw32-windres
+        STRIP=i686-w64-mingw32-strip
+        WINLIB=lib
+        override CXX+= -m32
+        override WINDRES+= -F pe-i386
+    endif
+    STD_LIBS=-static-libgcc -static-libstdc++
 endif
 
 #result file name
-PLATFORM_SUFFIX=
-ifneq (,$(findstring x86_64,$(shell uname -a)))
-PLATFORM_SUFFIX=64
-endif
-ifneq (,$(findstring amd64,$(shell uname -a)))
-PLATFORM_SUFFIX=64
-endif
-
-SERVER_PREFIX=remodex
-SERVER_NAME=$(SERVER_PREFIX)
+OUTPUT_FILE=remodex
 ifneq (,$(findstring MINGW,$(PLATFORM)))
-SERVER_NAME=$(SERVER_NAME)$(PLATFORM_SUFFIX).exe
-endif
-ifneq (,$(findstring Linux,$(PLATFORM)))
-SERVER_NAME=$(SERVER_PREFIX)$(PLATFORM_SUFFIX)
-endif
-ifneq (,$(findstring FreeBSD,$(PLATFORM)))
-SERVER_NAME=$(SERVER_PREFIX)_freebsd$(PLATFORM_SUFFIX)
+OUTPUT_FILE=remodex.exe
 endif
 
-### Directories, libraries, includes
 ifneq (,$(findstring MINGW,$(PLATFORM)))
-SERVER_INCLUDES+= -DSTANDALONE $(INCLUDES) -Iinclude
-SERVER_LIBS= -Llib -lzdll -lenet -lws2_32 -lwinmm -lstdc++
+SERVER_INCLUDES= -DSTANDALONE $(INCLUDES) -Iinclude
+SERVER_LIBS= -mwindows $(STD_LIBS) -L$(WINLIB) -Lenet -lenet -lz -lwinmm
+SERVER_WIN_LIBS=-lws2_32 -lwsock32
 else
-SERVER_INCLUDES+= -DSTANDALONE $(INCLUDES)
-SERVER_LIBS= -L/usr/local/lib -lenet -lz -lstdc++ -lm
-endif
-
-ifeq ($(PLATFORM),SunOS)
-SERVER_LIBS+= -lsocket -lnsl
-endif
-
-CXXFLAGS=-fomit-frame-pointer -Wall -fsigned-char -DSTANDALONE
-
-INCLUDES= -Ishared -Iengine -Ifpsgame -Imod -Imod/hashlib2plus/src -Imod/cryptomod/polarssl/include
-
-### Embended ENET
-ifeq ($(ENET_USE_SYSTEM_LIBS),true)
-else
-override INCLUDES += -Ienet/include
-override SERVER_LIBS += -Lenet/.libs
+SERVER_INCLUDES= -DSTANDALONE $(INCLUDES)
+SERVER_LIBS= -Lenet -lenet -lz
 endif
 
 SERVER_OBJS= \
@@ -99,27 +70,19 @@ SERVER_OBJS= \
 	mod/cryptomod/polarssl/library/sha1-standalone.o \
 	mod/cryptomod/polarssl/library/sha2-standalone.o \
 	mod/cryptomod/polarssl/library/sha4-standalone.o \
-      	mod/banlist-standalone.o \
-	mod/jsonbanlist-standalone.o \
+	mod/banlist-standalone.o \
+	mod/authservers-standalone.o \
 	mod/remodex-standalone.o \
 	mod/arena-standalone.o \
 	mod/zombie-standalone.o
 
-### Options checks
-
-
-
-#geoip
+# geoip
 ifeq ($(USE_GEOIP),true)
-override CXXFLAGS+= -DGEOIP -DGEOIPDATADIR -DPACKAGE_VERSION=\"1.6.9\"
-override INCLUDES+= -Imod/libGeoIP/
-override SERVER_OBJS+= \
-        mod/geoipmod2-standalone.o \
-	mod/libGeoIP/GeoIP-standalone.o \
-	mod/libGeoIP/GeoIPCity-standalone.o \
-        mod/libGeoIP/GeoIP_deprecated-standalone.o
+override INCLUDES+= -Imod/libmaxminddb/include -Imod/libGeoIP/libGeoIP
+override SERVER_LIBS+= -Lmod/libmaxminddb/src/.libs -Lmod/libGeoIP/libGeoIP/.libs -lmaxminddb -lGeoIP
+override SERVER_OBJS+= mod/geoipmod-standalone.o
 endif
-#end of geoip
+# end geoip
 
 #irc
 ifeq ($(USE_IRCBOT),true)
@@ -127,8 +90,6 @@ override CXXFLAGS+= -DIRC
 override SERVER_OBJS+= mod/irc-standalone.o
 endif
 #end of irc
-
-
 
 #use db
 ifeq ($(USE_SQLITE3),true)
@@ -140,8 +101,6 @@ endif
 endif
 #end of use db
 
-
-
 #sqlite3
 ifeq ($(USE_SQLITE3),true)
 override CXXFLAGS+= -DSQLITE3
@@ -151,8 +110,9 @@ override SERVER_LIBS+= -lsqlite3
 else
 override CXXFLAGS+= -DSQLITE_THREADSAFE=1
 override INCLUDES+= -Imod/sqlite3
+
 #linux-only libs
-ifeq ($(PLATFORM),Linux)
+ifneq (,$(findstring linux,$(PLATFORM)))
 override SERVER_LIBS+= -ldl -lpthread
 endif
 override SERVER_OBJS+= mod/sqlite3/sqlite3-standalone.o
@@ -160,10 +120,7 @@ endif
 
 override SERVER_OBJS+= mod/sqlite3-standalone.o
 endif
-
 #end of sqlite3
-
-
 
 #mysql
 ifeq ($(USE_MYSQL),true)
@@ -227,73 +184,83 @@ override SERVER_OBJS += mod/mysql-standalone.o
 endif
 #end of mysql
 
-
-
 default: release
 
 release: release-flags 
 release-flags: override CXXFLAGS+=-O2 -s
 release-flags: build
 
-
 debug: debug-flags 
 debug-flags: override CXXFLAGS+=-O0 -g -DDEBUG -DDEBUG_SQL
 debug-flags: build
 
-build: revision server
+build: server
 
-revision:
-SVNVERSION= $(shell svnversion -cn . 2>/dev/null | sed -e "s/.*://" -e "s/\([0-9]*\).*/\1/" | grep "[0-9]") 
-ifneq "$(SVNVERSION)" " "
-override CXXFLAGS+= -DREMOD_VERSION="\"SVN build rev: $(SVNVERSION)\""
+enet/libenet.a:
+	$(MAKE)	-C enet
+
+libenet: enet/libenet.a
+
+clean-enet:
+	$(MAKE) -C enet clean
+
+mod/libmaxminddb/Makefile:
+	cd mod/libmaxminddb; autoreconf -f -i; ./configure --disable-shared --disable-binaries --disable-tests --host=$(TARGETHOST)
+
+mod/libmaxminddb/src/.libs/libmaxminddb.a: mod/libmaxminddb/Makefile
+	$(MAKE)	-C mod/libmaxminddb
+
+libmaxminddb: mod/libmaxminddb/src/.libs/libmaxminddb.a
+
+clean-maxminddb: mod/libmaxminddb/Makefile
+	$(MAKE) -C mod/libmaxminddb clean
+
+mod/libGeoIP/Makefile:
+	cd mod/libGeoIP; autoreconf -f -i; ./configure --disable-shared --host=$(TARGETHOST)
+
+mod/libGeoIP/libGeoIP/.libs/libGeoIP.a: mod/libGeoIP/Makefile
+	$(MAKE)	-C mod/libGeoIP
+
+libgeoip: mod/libGeoIP/libGeoIP/.libs/libGeoIP.a
+
+clean-libgeoip: mod/libGeoIP/Makefile
+	$(MAKE)	-C mod/libGeoIP/ clean
+
+ifeq ($(USE_EXPEREMENTAL_DISCORD),true)
+DISCORD_TARGET=discord
+DISCORD_CLEAN_TARGET=discord-clean
+override SERVER_LIBS+= -Lmod/discord -ldiscord -lpthread
+override SERVER_OBJS+= mod/discordmod-standalone.o
+
+discord: mod/discord/libdiscord.a
+
+mod/discord/libdiscord.a:
+	$(MAKE)	-C mod/discord
+
+discord-clean:
+	$(MAKE)	-C mod/discord clean
 endif
 
-enet/Makefile:
-	cd enet; autoreconf -vfi; ./configure --enable-shared=no --enable-static=yes
-	
-libenet: enet/Makefile
-	$(MAKE)	-C enet/ all
-
-clean-enet: enet/Makefile
-	$(MAKE) -C enet/ maintainer-clean
-
-geoip/Makefile:
-	cd mod/GeoIP; chmod +x configure; ./configure --enable-shared=no --enable-static=yes
-
-libgeoip: geoip/Makefile
-	$(MAKE)	-C mod/GeoIP/libGeoIP/ all
-
-clean-geoip: geoip/Makefile
-	$(MAKE) -C mod/GeoIP/libGeoIP/ maintainer-clean
-
-clean: clean-enet
+clean: clean-libgeoip clean-maxminddb clean-enet $(DISCORD_CLEAN_TARGET)
 	-$(RM) $(SERVER_OBJS) 
-
-%.h.gch: %.h
-	$(CXX) $(CXXFLAGS) -o $@.tmp $(subst .h.gch,.h,$@)
-	$(MV) $@.tmp $@
 
 %-standalone.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c -o $@ $(subst -standalone.o,.cpp,$@) 
 
 %-standalone.o: %.c
-	$(CXX) $(CXXFLAGS) -c -o $@ $(subst -standalone.o,.c,$@)	
+	$(CC) $(CXXFLAGS) -c -o $@ $(subst -standalone.o,.c,$@)	
 
+res/remod.res:
+	$(WINDRES) -I res -i res/mingw.rc -J rc -o res/remod.res -O coff
+
+servericon: res/remod.res
 
 $(SERVER_OBJS): CXXFLAGS += $(SERVER_INCLUDES)
 
 ifneq (,$(findstring MINGW,$(PLATFORM)))
-server: $(SERVER_OBJS)
-	$(CXX) $(CXXFLAGS) -o $(SERVER_NAME) $(SERVER_OBJS) $(SERVER_LIBS)
-
+server:	libenet libgeoip libmaxminddb servericon $(DISCORD_TARGET) $(SERVER_OBJS)
+	$(CXX) $(CXXFLAGS) -o ../$(OUTPUT_FILE) res/remod.res $(SERVER_OBJS) $(SERVER_LIBS)
 else
-ifeq ($(ENET_USE_SYSTEM_LIBS),true)
-server:	$(SERVER_OBJS)
-	$(CXX) $(CXXFLAGS) -o $(SERVER_NAME) $(SERVER_OBJS) $(SERVER_LIBS)  
-	$(MV) $(SERVER_NAME) ../$(SERVER_NAME)
-else
-server:	libenet $(SERVER_OBJS)
-	$(CXX) $(CXXFLAGS) -o $(SERVER_NAME) $(SERVER_OBJS) $(SERVER_LIBS)  
-	$(MV) $(SERVER_NAME) ../$(SERVER_NAME)
-endif
+server:	libenet libgeoip libmaxminddb $(DISCORD_TARGET) $(SERVER_OBJS)
+	$(CXX) $(CXXFLAGS) -o ../$(OUTPUT_FILE) $(SERVER_OBJS) $(SERVER_LIBS)
 endif
