@@ -479,5 +479,11 @@ namespace server
     int numclients(int exclude , bool nospec, bool noai, bool priv);
     const char *colorname(clientinfo *ci, const char *name = NULL);
     void cleargbans();
+
+    //Remodex
+    void flushevents(clientinfo *ci, int millis);
+    void cleartimedevents(clientinfo *ci);
+    void spawnstate(clientinfo *ci);
+    void sendspawn(clientinfo *ci);
 }
 #endif

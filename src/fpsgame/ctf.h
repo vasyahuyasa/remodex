@@ -6,6 +6,9 @@
 #ifdef SERVMODE
 VAR(ctftkpenalty, 0, 1, 1);
 
+// Remodex
+VARN(flaglimit, FLAGLIMIT, 1, 10, INT_MAX);
+
 struct ctfservmode : servmode
 #else
 struct ctfclientmode : clientmode
